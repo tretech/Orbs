@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Orb Terms Admin</title>
+  <link rel="icon" href="./orb-icon.png" type="image/png">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <h1>Upload Terms CSV or Sheet</h1>
+  <input type="file" id="file-input" accept=".csv" />
+  <button id="import-btn">Import File</button>
+  <p id="status"></p>
+
+  <script type="module">
+    import './src/firebase.js';
+    import './src/data.js';
+  </script>
+</body>
+</html>
