@@ -41,9 +41,7 @@
       cursor: pointer;
       box-shadow: 2px 2px 0 #666;
     }
-    .tile:hover {
-      background: #e0e0e0;
-    }
+    .tile:hover { background: #e0e0e0; }
     #admin {
       background: rgba(0, 0, 0, 0.85);
       color: #0ff;
@@ -119,7 +117,7 @@
     <ul id="orbList"></ul>
   </div>
 
-  <!-- Typewriter Manifesto Terminal -->
+  <!-- Typewriter Manifesto -->
   <div id="typewriter" style="display:none;"></div>
 
   <!-- Sounds -->
@@ -127,6 +125,7 @@
   <audio id="adminSound" src="admin.mp3" preload="auto"></audio>
 
   <script>
+  document.addEventListener('DOMContentLoaded', () => {
     let input = '';
     const inputEl = document.getElementById('input');
     const term = document.getElementById('terminal');
@@ -140,7 +139,6 @@
     const consoleInput = document.getElementById('consoleInput');
     const consoleOutput = document.getElementById('consoleOutput');
 
-    // Terminal Input Handler
     document.addEventListener('keydown', e => {
       if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'a') {
         admin.style.display = 'flex';
@@ -165,7 +163,6 @@
       }
     });
 
-    // JS Console Eval
     consoleInput.addEventListener('keydown', e => {
       if (e.key === 'Enter') {
         const code = e.target.value;
@@ -179,20 +176,18 @@
       }
     });
 
-    // ORB Logic
     let orbCount = 0;
     function spawnOrb() {
       const orb = document.createElement('li');
       orb.textContent = `ORB-${++orbCount}`;
-      orbList.appendChild(orb);
+      document.getElementById('orbList').appendChild(orb);
       orbManager.style.display = 'block';
     }
     function resetOrbs() {
       orbCount = 0;
-      orbList.innerHTML = '';
+      document.getElementById('orbList').innerHTML = '';
     }
 
-    // Typewriter Manifesto
     function showManifesto() {
       const lines = [
         "Wnter Manifesto // RESTRICTED",
@@ -206,21 +201,20 @@
       typewriter.style.display = 'block';
       typewriter.textContent = '';
       let i = 0;
-      function type() {
+      function typeLine() {
         if (i < lines.length) {
           typewriter.textContent += lines[i] + "\n";
           i++;
-          setTimeout(type, 500);
+          setTimeout(typeLine, 500);
         }
       }
-      type();
+      typeLine();
     }
 
-    // Expose to console
-    window.showManifesto = showManifesto;
     window.spawnOrb = spawnOrb;
     window.resetOrbs = resetOrbs;
+    window.showManifesto = showManifesto;
+  });
   </script>
 </body>
-  
 </html>
