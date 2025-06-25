@@ -121,7 +121,7 @@
   <div id="typewriter" style="display:none;"></div>
 
   <!-- Sounds -->
-  <audio id="bootSound" src="boot.mp3" preload="auto"></audio>
+  <audio id="bootSound" preload="auto"></audio>
   <audio id="adminSound" src="admin.mp3" preload="auto"></audio>
 
   <script>
@@ -152,7 +152,10 @@
           if (input.toLowerCase() === 'wnter') {
             term.style.display = 'none';
             explore.style.display = 'block';
-            bootSound.play();
+            const randomIndex = Math.floor(Math.random() * 16) + 1;
+            bootSound.src = `boot${randomIndex}.mp3`;
+            bootSound.play().catch(err => console.log("Boot sound error:", err));
+
           }
           input = '';
         }
