@@ -95,4 +95,131 @@
   <!-- Explore Mode -->
   <div id="explore">
     <div class="tile" style="top: 20px; left: 20px;">SYSTEM.EXE</div>
-    <div class="tile" style="top
+    <div class="tile" style="top: 140px; left: 60px;">PROJECTS</div>
+    <div class="tile" style="top: 260px; left: 100px;">MANIFESTO.TXT</div>
+  </div>
+
+  <!-- Admin Panel -->
+  <div id="admin">
+    <h2>ADMIN MODE ACTIVE</h2>
+    <p>You've entered the control chamber. Proceed wisely...</p>
+  </div>
+
+  <!-- Dev Console -->
+  <div id="devConsole">
+    JS&gt; <input id="consoleInput" style="width:90%; background:black; border:none; color:#0f0; font-family:'Courier New'; font-size:1em;" />
+    <pre id="consoleOutput"></pre>
+  </div>
+
+  <!-- ORB Manager -->
+  <div id="orbManager">
+    <b>ORB MANAGER</b><br><br>
+    <button onclick="spawnOrb()">Spawn ORB</button>
+    <button onclick="resetOrbs()">Reset</button>
+    <ul id="orbList"></ul>
+  </div>
+
+  <!-- Typewriter Manifesto Terminal -->
+  <div id="typewriter" style="display:none;"></div>
+
+  <!-- Sounds -->
+  <audio id="bootSound" src="boot.mp3" preload="auto"></audio>
+  <audio id="adminSound" src="admin.mp3" preload="auto"></audio>
+
+  <script>
+    let input = '';
+    const inputEl = document.getElementById('input');
+    const term = document.getElementById('terminal');
+    const explore = document.getElementById('explore');
+    const admin = document.getElementById('admin');
+    const bootSound = document.getElementById('bootSound');
+    const adminSound = document.getElementById('adminSound');
+    const devConsole = document.getElementById('devConsole');
+    const orbManager = document.getElementById('orbManager');
+    const typewriter = document.getElementById('typewriter');
+    const consoleInput = document.getElementById('consoleInput');
+    const consoleOutput = document.getElementById('consoleOutput');
+
+    // Terminal Input Handler
+    document.addEventListener('keydown', e => {
+      if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'a') {
+        admin.style.display = 'flex';
+        adminSound.play();
+      } else if (term.style.display === 'block') {
+        if (e.key.length === 1) {
+          input += e.key;
+        } else if (e.key === 'Backspace') {
+          input = input.slice(0, -1);
+        } else if (e.key === 'Enter') {
+          if (input.toLowerCase() === 'wnter') {
+            term.style.display = 'none';
+            explore.style.display = 'block';
+            bootSound.play();
+          }
+          input = '';
+        }
+        inputEl.textContent = input;
+      } else if (e.key === '`') {
+        devConsole.style.display = devConsole.style.display === 'block' ? 'none' : 'block';
+        consoleInput.focus();
+      }
+    });
+
+    // JS Console Eval
+    consoleInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const code = e.target.value;
+        try {
+          const result = eval(code);
+          consoleOutput.textContent += `> ${code}\n${result}\n`;
+        } catch (err) {
+          consoleOutput.textContent += `> ${code}\nError: ${err.message}\n`;
+        }
+        e.target.value = '';
+      }
+    });
+
+    // ORB Logic
+    let orbCount = 0;
+    function spawnOrb() {
+      const orb = document.createElement('li');
+      orb.textContent = `ORB-${++orbCount}`;
+      orbList.appendChild(orb);
+      orbManager.style.display = 'block';
+    }
+    function resetOrbs() {
+      orbCount = 0;
+      orbList.innerHTML = '';
+    }
+
+    // Typewriter Manifesto
+    function showManifesto() {
+      const lines = [
+        "Wnter Manifesto // RESTRICTED",
+        "",
+        "We believe in precision, clarity, and creative rebellion.",
+        "We wield technology as an extension of intent.",
+        "The system is not the limit—it’s the challenge.",
+        "",
+        ":: EXECUTE BOLDNESS WITH COMPASSION ::"
+      ];
+      typewriter.style.display = 'block';
+      typewriter.textContent = '';
+      let i = 0;
+      function type() {
+        if (i < lines.length) {
+          typewriter.textContent += lines[i] + "\n";
+          i++;
+          setTimeout(type, 500);
+        }
+      }
+      type();
+    }
+
+    // Expose to console
+    window.showManifesto = showManifesto;
+    window.spawnOrb = spawnOrb;
+    window.resetOrbs = resetOrbs;
+  </script>
+</body>
+</html>
