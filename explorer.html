@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Orb Terms Explorer</title>
+  <link rel="icon" href="./orb-icon.png" type="image/png">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div id="canvas-holder"></div>
+
+  <div id="definition-panel" class="hidden">
+    <div id="definition-text"></div>
+    <div class="definition-controls">
+      <button id="prev-def">◀ Prev</button>
+      <button id="next-def">Next ▶</button>
+      <button id="ai-generate">✨ Add AI Definition</button>
+    </div>
+    <div class="ai-suggestion hidden">
+      <div class="suggestion-text"></div>
+      <div class="definition-controls">
+        <button id="accept-ai">✅ Accept</button>
+        <button id="retry-ai">🔁 Try Again</button>
+        <button id="cancel-ai">❌ Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import './src/firebase.js';
+    import './src/data.js';
+    import './src/orbs.js';
+    import './src/ui.js';
+  </script>
+</body>
+</html>
