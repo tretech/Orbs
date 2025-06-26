@@ -72,12 +72,12 @@
       color: #0ff;
       padding: 10px;
       font-family: 'Courier New';
-      display: none;
+     /* display: none; */
     }
     #orbList li {
       color: #0ff;
       font-family: 'Courier New', monospace;
-      font-size: 0.9em;
+      font-size: 1.2em;
       letter-spacing: 1px;
       margin: 4px 0;
       list-style: none;
@@ -175,7 +175,7 @@
         } else if (e.key === 'Backspace') {
           input = input.slice(0, -1);
         } else if (e.key === 'Enter') {
-          if (input.toLowerCase() === 'wnter') {
+          if (input.toLowerCase() === 'run') {
             term.style.display = 'none';
             explore.style.display = 'block';
             orbManager.style.display = 'block';
