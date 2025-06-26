@@ -140,6 +140,7 @@
       width: 100%;
       height: 200px;
       overflow: hidden;
+      background: #000;
     }
 
     .orb {
@@ -319,12 +320,15 @@
     let orbCount = 0;
     function spawnOrb() {
       console.log("ORB spawned");
-      const orb = document.createElement('li');
-      orb.textContent = `ORB-${++orbCount}`;
+      const orb = document.createElement('div');
+      orb.classList.add('orb');
+      orb.style.left = `${Math.random() * 180}px`;
+      orb.style.top = `${Math.random() * 160}px`;
       document.getElementById('orbList').appendChild(orb);
       orbManager.style.display = 'block';
-
       console.log(orb);
+    }
+
     }
     function resetOrbs() {
       orbCount = 0;
