@@ -197,10 +197,13 @@
 
     let orbCount = 0;
     function spawnOrb() {
+      console.log("ORB spawned");
       const orb = document.createElement('li');
       orb.textContent = `ORB-${++orbCount}`;
       document.getElementById('orbList').appendChild(orb);
       orbManager.style.display = 'block';
+
+      console.log(orb);
     }
     function resetOrbs() {
       orbCount = 0;
