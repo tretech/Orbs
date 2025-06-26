@@ -74,6 +74,31 @@
       font-family: 'Courier New';
       display: none;
     }
+    #orbList li {
+      color: #0ff;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+      letter-spacing: 1px;
+      margin: 4px 0;
+      list-style: none;
+
+      animation: flicker 1.3s infinite;
+      text-shadow:
+        0 0 2px #0ff,
+        0 0 5px #0ff,
+        0 0 10px #0ff;
+    }
+    
+    @keyframes flicker {
+      0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+        opacity: 0.95;
+      }
+      20%, 22%, 24%, 55% {
+        opacity: 0.6;
+        text-shadow: none;
+      }
+    }
+    
     #typewriter {
       color: #0f0;
       font-size: 0.9em;
