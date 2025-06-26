@@ -108,18 +108,32 @@
       overflow: hidden;
     }
     
+    #orbList {
+      position: relative;
+      width: 100%;
+      height: 200px;
+      overflow: hidden;
+    }
+
     .orb {
       position: absolute;
       width: 20px;
       height: 20px;
       border-radius: 50%;
-      background: radial-gradient(#0ff, #004);
-      box-shadow: 0 0 10px #0ff;
-      animation: float 5s infinite linear;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
+      background: radial-gradient(circle at center, #0ff 30%, #003 100%);
+      box-shadow:
+        0 0 4px #0ff,
+        0 0 8px #0ff,
+        0 0 12px #0ff;
+      animation: floatOrb 6s infinite ease-in-out;
     }
+
+    @keyframes floatOrb {
+      0%   { transform: translateY(0) scale(1); opacity: 0.9; }
+      50%  { transform: translateY(-20px) scale(1.2); opacity: 1; }
+      100% { transform: translateY(0) scale(1); opacity: 0.9; }
+    }
+
 
     @keyframes float {
       0% { transform: translate(-50%, -50%) scale(1); }
@@ -180,24 +194,24 @@
 
 
     let orbCount = 0;
+    
     function spawnOrb() {
-      console.log("ORB spawned");
-      const orb = document.createElement('li');
+      const orb = document.createElement('div');
       orb.classList.add('orb');
-      orb.dataset.id = orbCount;
-      orbContainer.appendChild(orb);
+      orb.style.left = `${Math.random() * 200}px`;
+      orb.style.top = `${Math.random() * 160}px`;
       document.getElementById('orbList').appendChild(orb);
-      orbManager.style.display = 'block';
-
-      console.log(orb);
+      console.log("ORB spawned:", orb);
     }
+
     function resetOrbs() {
       orbCount = 0;
       document.getElementById('orbList').innerHTML = '';
     }
 
     function showManifesto() {
-    <ul id="orbList"></ul>
+    <div id="orbList"></div>
+
   </div>
 
   <!-- Typewriter Manifesto -->
