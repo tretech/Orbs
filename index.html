@@ -179,6 +179,21 @@
         e.target.value = '';
       }
     });
+    
+    document.querySelectorAll('.tile').forEach(tile => {
+      tile.addEventListener('click', () => {
+        const label = tile.textContent.trim().toUpperCase();
+
+        if (label === 'SYSTEM.EXE') {
+          alert("Launching system diagnostics... (to be implemented)");
+        } else if (label === 'PROJECTS') {
+          alert("Opening projects workspace... (to be implemented)");
+        } else if (label === 'MANIFESTO.TXT') {
+          showManifesto();
+        }
+      });
+    });
+
 
     let orbCount = 0;
     function spawnOrb() {
