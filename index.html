@@ -29,6 +29,33 @@
       font-family: 'Tahoma', sans-serif;
       color: black;
     }
+    #orbList {
+      position: relative;
+      width: 100%;
+      height: 200px;
+      background: #000;
+      overflow: hidden;
+    }
+
+    .orb {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: radial-gradient(circle at center, #0ff 30%, #003 100%);
+      box-shadow:
+        0 0 4px #0ff,
+        0 0 8px #0ff,
+        0 0 12px #0ff;
+    animation: floatOrb 6s infinite ease-in-out;
+    }
+
+    @keyframes floatOrb {
+      0%   { transform: translateY(0) scale(1); opacity: 0.9; }
+      50%  { transform: translateY(-20px) scale(1.2); opacity: 1; }
+      100% { transform: translateY(0) scale(1); opacity: 0.9; }
+    }
+
     .tile {
       position: absolute;
       width: 120px;
@@ -184,24 +211,21 @@
     <button onclick="spawnOrb()">Spawn ORB</button>
     <button onclick="resetOrbs()">Reset</button>
     <canvas id="orbCanvas" width="220" height="200"></canvas>
-        } else if (label === 'PROJECTS') {
-          alert("Opening projects workspace... (to be implemented)");
-        } else if (label === 'MANIFESTO.TXT') {
-          showManifesto();
-        }
-      });
-    });
-
-
-    let orbCount = 0;
     
+    <div id="orbList"></div>
+  </div>
+  <script>
+    let orbCount = 0;
+
     function spawnOrb() {
+      console.log("ORB spawned");
       const orb = document.createElement('div');
       orb.classList.add('orb');
+      orb.dataset.id = orbCount;
       orb.style.left = `${Math.random() * 200}px`;
       orb.style.top = `${Math.random() * 160}px`;
       document.getElementById('orbList').appendChild(orb);
-      console.log("ORB spawned:", orb);
+      console.log(orb);
     }
 
     function resetOrbs() {
@@ -210,10 +234,9 @@
     }
 
     function showManifesto() {
-    <div id="orbList"></div>
-
-  </div>
-
+      // your manifesto popup here
+    }
+  </script>
   <!-- Typewriter Manifesto -->
   <div id="typewriter" style="display:none;"></div>
 
