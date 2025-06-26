@@ -153,6 +153,7 @@
           if (input.toLowerCase() === 'wnter') {
             term.style.display = 'none';
             explore.style.display = 'block';
+            orbManager.style.display = 'block';
             const randomIndex = Math.floor(Math.random() * 16) + 1;
             bootSound.src = `boot${randomIndex}.mp3`;
             bootSound.play().catch(err => console.log("Boot sound error:", err));
