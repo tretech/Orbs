@@ -144,7 +144,7 @@
       if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'a') {
         admin.style.display = 'flex';
         adminSound.play();
-      } else if (term.style.display === 'block') {
+      } else if (getComputedStyle(term).display === 'block') {
         if (e.key.length === 1) {
           input += e.key;
         } else if (e.key === 'Backspace') {
