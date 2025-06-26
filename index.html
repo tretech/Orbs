@@ -218,16 +218,16 @@
   <script>
     let orbCount = 0;
 
-    function spawnOrb() {
-      console.log("ORB spawned");
-      const orb = document.createElement('div');
-      orb.classList.add('orb');
-      orb.dataset.id = orbCount;
-      orb.style.left = `${Math.random() * 200}px`;
-      orb.style.top = `${Math.random() * 160}px`;
-      document.getElementById('orbList').appendChild(orb);
-      console.log(orb);
-    }
+  function spawnOrb() {
+    console.log("ORB spawned");
+    const orb = document.createElement('div');
+    orb.classList.add('orb');
+    orb.style.left = `${Math.random() * 200}px`;
+    orb.style.top = `${Math.random() * 160}px`;
+    document.getElementById('orbList').appendChild(orb);
+    console.log(orb);
+  }
+
 
     function resetOrbs() {
       orbCount = 0;
