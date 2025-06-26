@@ -101,6 +101,32 @@
       }
     }
     
+    #orbContainer {
+      position: relative;
+      width: 100%;
+      height: 200px;
+      overflow: hidden;
+    }
+    
+    .orb {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: radial-gradient(#0ff, #004);
+      box-shadow: 0 0 10px #0ff;
+      animation: float 5s infinite linear;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    @keyframes float {
+      0% { transform: translate(-50%, -50%) scale(1); }
+      50% { transform: translate(-45%, -55%) scale(1.2); }
+      100% { transform: translate(-50%, -50%) scale(1); }
+    }
+
     #typewriter {
       color: #0f0;
       font-size: 0.9em;
@@ -124,6 +150,8 @@
     <div class="tile" style="top: 260px; left: 100px;">MANIFESTO.TXT</div>
   </div>
 
+  <div id="orbContainer"></div>
+
   <!-- Admin Panel -->
   <div id="admin">
     <h2>ADMIN MODE ACTIVE</h2>
@@ -141,6 +169,34 @@
     <b>ORB MANAGER</b><br><br>
     <button onclick="spawnOrb()">Spawn ORB</button>
     <button onclick="resetOrbs()">Reset</button>
+    <canvas id="orbCanvas" width="220" height="200"></canvas>
+        } else if (label === 'PROJECTS') {
+          alert("Opening projects workspace... (to be implemented)");
+        } else if (label === 'MANIFESTO.TXT') {
+          showManifesto();
+        }
+      });
+    });
+
+
+    let orbCount = 0;
+    function spawnOrb() {
+      console.log("ORB spawned");
+      const orb = document.createElement('li');
+      orb.classList.add('orb');
+      orb.dataset.id = orbCount;
+      orbContainer.appendChild(orb);
+      document.getElementById('orbList').appendChild(orb);
+      orbManager.style.display = 'block';
+
+      console.log(orb);
+    }
+    function resetOrbs() {
+      orbCount = 0;
+      document.getElementById('orbList').innerHTML = '';
+    }
+
+    function showManifesto() {
     <ul id="orbList"></ul>
   </div>
 
