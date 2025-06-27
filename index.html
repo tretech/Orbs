@@ -49,6 +49,23 @@
         0 0 12px #0ff;
     animation: floatOrb 6s infinite ease-in-out;
     }
+    
+    #orbManager button {
+      margin: 5px 0;
+      padding: 8px 12px;
+      font-family: 'Courier New', monospace;
+      background-color: #000;
+      color: #0ff;
+      border: 1px solid #0ff;
+      cursor: pointer;
+      box-shadow: 0 0 4px #0ff;
+      transition: all 0.3s ease;
+    }
+
+    #orbManager button:hover {
+      background-color: #003;
+      box-shadow: 0 0 10px #0ff;
+    }
 
     @keyframes floatOrb {
       0%   { transform: translateY(0) scale(1); opacity: 0.9; }
@@ -101,23 +118,7 @@
       font-family: 'Courier New';
      /* display: none; */
     }
-    #orbList li {
-      color: #0ff;
-      font-family: 'Courier New', monospace;
-      font-size: 1.2em;
-      letter-spacing: 1px;
-      margin: 4px 0;
-      list-style: none;
-
-      animation: flicker 1.3s infinite;
-      text-shadow:
-        0 0 2px #0ff,
-        0 0 5px #0ff,
-        0 0 10px #0ff;
-      background: rgba(0, 255, 255, 0.05);
-      border-left: 2px solid #0ff;
-    }
-    
+   
     @keyframes flicker {
       0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
         opacity: 0.95;
@@ -212,26 +213,34 @@
     <button onclick="spawnOrb()">Spawn ORB</button>
     <button onclick="resetOrbs()">Reset</button>
     <canvas id="orbCanvas" width="220" height="200"></canvas>
-    
+    <button onclick="launchAdmin()">ADMIN MODE</button>
+    <button onclick="launchExplorer()">DEFINITION EXPLORER</button>
     <div id="orbList"></div>
   </div>
   <script>
     let orbCount = 0;
 
-  function spawnOrb() {
-    console.log("ORB spawned");
-    const orb = document.createElement('div');
-    orb.classList.add('orb');
-    orb.style.left = `${Math.random() * 200}px`;
-    orb.style.top = `${Math.random() * 160}px`;
-    document.getElementById('orbList').appendChild(orb);
-    console.log(orb);
-  }
+    function spawnOrb() {
+      console.log("ORB spawned");
+      const orb = document.createElement('div');
+      orb.classList.add('orb');
+      orb.style.left = `${Math.random() * 200}px`;
+      orb.style.top = `${Math.random() * 160}px`;
+      document.getElementById('orbList').appendChild(orb);
+      console.log(orb);
+    }
 
 
     function resetOrbs() {
       orbCount = 0;
       document.getElementById('orbList').innerHTML = '';
+    }
+    function launchAdmin() {
+      window.open('admin.html', '_blank');
+    }
+
+    function launchExplorer() {
+      window.open('explorer.html', '_blank');
     }
 
     function showManifesto() {
