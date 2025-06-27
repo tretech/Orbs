@@ -1,36 +1,480 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Orb Terms Explorer</title>
-  <link rel="icon" href="./orb-icon.png" type="image/png">
-  <link rel="stylesheet" href="assets/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Energy Orbs - Definition Explorer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif; /* Using Inter font */
+            cursor: none;
+            color: #fff; /* Default text color */
+        }
+        
+        #canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        .definition-panel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #00ffff;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 600px;
+            color: #fff;
+            opacity: 0;
+            transition: all 0.5s ease-out; /* Smoother transition */
+            pointer-events: auto;
+            box-shadow: 0 0 50px rgba(0, 255, 255, 0.5); /* More dramatic shadow */
+            backdrop-filter: blur(5px); /* Frosted glass effect */
+            -webkit-backdrop-filter: blur(5px); /* For Safari */
+            display: flex; /* Use flexbox for vertical alignment */
+            flex-direction: column;
+            align-items: center; /* Center items horizontally */
+        }
+        
+        .definition-panel.active {
+            opacity: 1;
+        }
+        
+        .term-title {
+            font-size: 2.8em; /* Slightly larger */
+            font-weight: bold;
+            color: #00ffff;
+            text-align: center;
+            margin-bottom: 25px; /* More space */
+            text-shadow: 0 0 15px rgba(0, 255, 255, 0.7); /* More intense glow */
+        }
+        
+        .definition-text {
+            font-size: 1.3em; /* Slightly larger */
+            line-height: 1.7;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .definition-tags {
+            font-size: 0.9em;
+            color: #888;
+            margin-top: -15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .definition-counter {
+            text-align: center;
+            color: #00ffff;
+            font-size: 1em;
+            margin-bottom: 20px;
+            opacity: 0.8;
+        }
+        
+        .controls {
+            text-align: center;
+            color: #aaa;
+            font-size: 1em; /* Slightly larger */
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
+        }
+        
+        .mouse-glow {
+            position: absolute;
+            width: 30px; /* Larger glow */
+            height: 30px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(0, 255, 255, 0.9) 0%, rgba(0, 255, 255, 0) 80%); /* More vibrant */
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            transition: transform 0.05s ease-out, width 0.1s ease, height 0.1s ease;
+            z-index: 99;
+            filter: blur(5px); /* Soften the glow */
+        }
+
+        /* Message box styles */
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #ffcc00;
+            border-radius: 10px;
+            padding: 20px;
+            color: #fff;
+            text-align: center;
+            z-index: 1000;
+            box-shadow: 0 0 30px rgba(255, 204, 0, 0.5);
+            max-width: 80%;
+        }
+
+        .message-box button {
+            background-color: #00ffff;
+            color: #000;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 1em;
+            margin-top: 15px;
+            transition: background-color 0.3s ease;
+        }
+
+        .message-box button:hover {
+            background-color: #00e6e6;
+        }
+    </style>
 </head>
 <body>
-  <div id="canvas-holder"></div>
-
-  <div id="definition-panel" class="hidden">
-    <div id="definition-text"></div>
-    <div class="definition-controls">
-      <button id="prev-def">◀ Prev</button>
-      <button id="next-def">Next ▶</button>
-      <button id="ai-generate">✨ Add AI Definition</button>
+    <canvas id="canvas"></canvas>
+    <div class="ui-overlay">
+        <div class="definition-panel">
+            <div class="term-title"></div>
+            <div class="definition-text"></div>
+            <div class="definition-tags"></div>
+            <div class="definition-counter"></div>
+            <div class="controls">Click on an orb to reveal its definition. Press ESC to close.</div>
+        </div>
     </div>
-    <div class="ai-suggestion hidden">
-      <div class="suggestion-text"></div>
-      <div class="definition-controls">
-        <button id="accept-ai">✅ Accept</button>
-        <button id="retry-ai">🔁 Try Again</button>
-        <button id="cancel-ai">❌ Cancel</button>
-      </div>
-    </div>
-  </div>
+    <div class="mouse-glow"></div>
 
-  <script type="module">
-    import './src/firebase.js';
-    import './src/data.js';
-    import './src/orbs.js';
-    import './src/ui.js';
-  </script>
+    <!-- THREE.js library (UMD build, exposing THREE global) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- THREE.js examples (UMD builds, relying on global THREE) -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <!-- Firebase SDKs (using type="module" as they are fine) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, getDocs, doc, setDoc, updateDoc, writeBatch, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // Assume __app_id, __firebase_config, __initial_auth_token are provided by the environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let currentUserId = null;
+        let isAppInitialized = false; // Flag to ensure Three.js setup runs only once
+
+        // --- Core Application Logic ---
+        let scene, camera, renderer, cssRenderer;
+        let controls;
+        let mouse = new THREE.Vector2();
+        let raycaster = new THREE.Raycaster();
+        let terms = []; // Array to hold terms fetched from Firestore
+        let currentOrb = null;
+        let definitionPanel, termTitle, definitionText, definitionCounter, definitionTags;
+        let definitionPanelVisible = false;
+        let currentDefinitionIndex = 0;
+        
+        // Authentication State Change Listener - This is the main controller for the app's lifecycle.
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                // User is signed in.
+                currentUserId = user.uid;
+                console.log("Authentication successful. User ID:", currentUserId);
+                
+                // Now that we have a user, we can safely initialize the app and listen to Firestore.
+                initializeAppAndListenForData();
+
+            } else {
+                // User is signed out.
+                currentUserId = null;
+                console.log("No user authenticated. App will not load data.");
+                // Optionally, you could show a "logged out" state here.
+            }
+        });
+
+        // Function to handle the initial authentication attempt.
+        async function authenticateUser() {
+            try {
+                if (initialAuthToken) {
+                    console.log("Attempting sign-in with custom token...");
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    console.log("No custom token found. Attempting anonymous sign-in...");
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Custom token sign-in failed:", error.message, "Falling back to anonymous sign-in.");
+                // Show a message about the fallback, but don't make it blocking
+                showMessageBox("Authentication Notice", `Could not sign in with the provided token (${error.message}). Signing in anonymously instead.`);
+                try {
+                    await signInAnonymously(auth);
+                } catch (anonError) {
+                    console.error("Anonymous sign-in also failed:", anonError);
+                    showMessageBox("Critical Authentication Failure", `Could not sign in to the service: ${anonError.message}. The application cannot continue.`);
+                }
+            }
+        }
+
+
+        // Function to show a custom message box
+        function showMessageBox(title, message) {
+            // Remove any existing message box first
+            const existingBox = document.querySelector('.message-box');
+            if (existingBox) {
+                document.body.removeChild(existingBox);
+            }
+            
+            const messageBox = document.createElement('div');
+            messageBox.className = 'message-box';
+            messageBox.innerHTML = `
+                <h3>${title}</h3>
+                <p>${message}</p>
+                <button>OK</button>
+            `;
+            document.body.appendChild(messageBox);
+
+            messageBox.querySelector('button').onclick = () => {
+                document.body.removeChild(messageBox);
+            };
+        }
+
+        // Function to create an orb
+        function createOrb(term, position) {
+            const geometry = new THREE.SphereGeometry(1.5, 32, 32); 
+            const material = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.7 });
+            const orb = new THREE.Mesh(geometry, material);
+            orb.position.copy(position);
+            orb.userData = { term: term }; 
+            scene.add(orb);
+            return orb;
+        }
+
+        // Initialize Three.js scene, camera, and renderer
+        function initThreeJS() {
+            scene = new THREE.Scene();
+            
+            const axesHelper = new THREE.AxesHelper( 5 ); 
+            scene.add( axesHelper );
+            
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 20; 
+
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas'), alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+
+            cssRenderer = new THREE.CSS2DRenderer();
+            cssRenderer.setSize(window.innerWidth, window.innerHeight);
+            cssRenderer.domElement.style.position = 'absolute';
+            cssRenderer.domElement.style.top = '0px';
+            document.body.appendChild(cssRenderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, cssRenderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = false;
+            controls.minDistance = 5;
+            controls.maxDistance = 50;
+
+            definitionPanel = document.querySelector('.definition-panel');
+            termTitle = document.querySelector('.term-title');
+            definitionText = document.querySelector('.definition-text');
+            definitionCounter = document.querySelector('.definition-counter');
+            definitionTags = document.querySelector('.definition-tags');
+
+            window.addEventListener('resize', onWindowResize, false);
+            window.addEventListener('mousemove', onMouseMove, false);
+            window.addEventListener('click', onClick, false);
+            window.addEventListener('keydown', onKeyDown, false);
+            
+            console.log("Three.js environment initialized.");
+        }
+        
+        function populateOrbs(termsData) {
+            if (!scene) return; // Don't try to populate if scene doesn't exist
+
+            const orbsToRemove = scene.children.filter(obj => obj.userData && obj.userData.term);
+            orbsToRemove.forEach(obj => scene.remove(obj));
+
+            if (termsData.length === 0) {
+                console.warn("No terms data to populate orbs with.");
+                showMessageBox("No Orbs to Display", "It looks like there's no data in the database yet. Please use a data importer tool to add terms.");
+                return;
+            }
+            
+            termsData.forEach((termItem, index) => {
+                const angle = (index / termsData.length) * Math.PI * 2;
+                const radius = 8 + (Math.random() - 0.5) * 4; // Add radius variation
+                const x = Math.cos(angle) * radius;
+                const y = Math.sin(angle) * radius;
+                const z = (Math.random() - 0.5) * 10; 
+                createOrb(termItem, new THREE.Vector3(x, y, z));
+            });
+            console.log(`Populated scene with ${termsData.length} orbs.`);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            cssRenderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        const mouseGlow = document.querySelector('.mouse-glow');
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            mouseGlow.style.left = `${event.clientX}px`;
+            mouseGlow.style.top = `${event.clientY}px`;
+        }
+
+        function onClick(event) {
+            event.preventDefault();
+            if (definitionPanelVisible) {
+                if (!definitionPanel.contains(event.target) && event.target !== definitionPanel) {
+                     hideDefinitionPanel();
+                }
+                return;
+            }
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(scene.children);
+            if (intersects.length > 0) {
+                const intersectedOrb = intersects[0].object;
+                if (intersectedOrb.userData && intersectedOrb.userData.term) {
+                    currentOrb = intersectedOrb;
+                    showDefinitionPanel(currentOrb.userData.term);
+                }
+            }
+        }
+
+        function onKeyDown(event) {
+            if (event.key === 'Escape' && definitionPanelVisible) {
+                hideDefinitionPanel();
+            } else if (event.key === 'ArrowRight' && definitionPanelVisible && currentOrb) {
+                cycleDefinition(1);
+            } else if (event.key === 'ArrowLeft' && definitionPanelVisible && currentOrb) {
+                cycleDefinition(-1);
+            }
+        }
+
+        function showDefinitionPanel(termData) {
+            if (!termData) return;
+            currentDefinitionIndex = 0;
+            updateDefinitionPanel(termData);
+            definitionPanel.classList.add('active');
+            definitionPanelVisible = true;
+        }
+
+        function hideDefinitionPanel() {
+            definitionPanel.classList.remove('active');
+            definitionPanelVisible = false;
+            currentOrb = null;
+        }
+
+        function cycleDefinition(direction) {
+            if (currentOrb && currentOrb.userData.term && currentOrb.userData.term.definitions) {
+                const definitions = currentOrb.userData.term.definitions;
+                if (definitions.length > 1) {
+                    currentDefinitionIndex = (currentDefinitionIndex + direction + definitions.length) % definitions.length;
+                    updateDefinitionPanel(currentOrb.userData.term);
+                }
+            }
+        }
+
+        function updateDefinitionPanel(termData) {
+            termTitle.textContent = termData.term || 'No Term';
+            if (termData.definitions && termData.definitions.length > 0) {
+                const currentDef = termData.definitions[currentDefinitionIndex];
+                definitionText.textContent = currentDef.text || 'No definition text provided.';
+                definitionTags.textContent = `Tags: ${currentDef.tags ? currentDef.tags.join(', ') : 'None'}`;
+                definitionCounter.textContent = `Definition ${currentDefinitionIndex + 1} of ${termData.definitions.length}`;
+            } else {
+                definitionText.textContent = 'No definitions available for this term.';
+                definitionTags.textContent = '';
+                definitionCounter.textContent = '';
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+            cssRenderer.render(scene, camera);
+        }
+
+        // --- Firestore Interaction and Data Loading ---
+        function initializeAppAndListenForData() {
+            if (!isAppInitialized) {
+                 // --- ONE-TIME SETUP ---
+                initThreeJS(); // Initialize the 3D scene
+                animate(); // Start the animation loop
+                
+                // Display current user ID after initial setup
+                const userIdDisplay = document.createElement('div');
+                userIdDisplay.style.position = 'absolute';
+                userIdDisplay.style.bottom = '10px';
+                userIdDisplay.style.left = '10px';
+                userIdDisplay.style.color = '#fff';
+                userIdDisplay.style.fontSize = '0.8em';
+                userIdDisplay.textContent = `User ID: ${currentUserId}`;
+                document.body.appendChild(userIdDisplay);
+                
+                isAppInitialized = true;
+            }
+
+            const termsCollectionRef = collection(db, `artifacts/${appId}/public/data/terms`);
+            
+            // Set up a real-time listener for terms to update automatically
+            onSnapshot(termsCollectionRef, (snapshot) => {
+                const updatedTerms = [];
+                snapshot.forEach(doc => {
+                    updatedTerms.push({ id: doc.id, ...doc.data() });
+                });
+                terms = updatedTerms;
+                console.log("Real-time update: Fetched/updated terms from Firestore:", terms);
+                
+                populateOrbs(terms); // Always re-populate orbs with the latest data
+
+                // If definition panel is open, refresh its content
+                if (definitionPanelVisible && currentOrb && currentOrb.userData.term) {
+                    const updatedCurrentTerm = terms.find(t => t.id === currentOrb.userData.term.id);
+                    if (updatedCurrentTerm) {
+                        currentOrb.userData.term = updatedCurrentTerm; 
+                        // Keep currentDefinitionIndex unless it's now out of bounds
+                        if (currentDefinitionIndex >= updatedCurrentTerm.definitions.length) {
+                             currentDefinitionIndex = 0;
+                        }
+                        updateDefinitionPanel(currentOrb.userData.term);
+                    } else {
+                        hideDefinitionPanel();
+                    }
+                }
+            }, (error) => {
+                console.error("Error listening to real-time updates:", error);
+                showMessageBox("Real-time Update Error", `Failed to get real-time updates: ${error.message}.`);
+            });
+        }
+        
+        // Start the authentication process when the script loads.
+        authenticateUser();
+    </script>
 </body>
 </html>
