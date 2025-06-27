@@ -1,20 +1,219 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Orb Terms Admin</title>
-  <link rel="icon" href="./orb-icon.png" type="image/png">
-  <link rel="stylesheet" href="assets/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Importer for Energy Orbs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .form-container {
+            transition: all 0.3s ease-in-out;
+        }
+        .form-container:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+    </style>
 </head>
-<body>
-  <h1>Upload Terms CSV or Sheet</h1>
-  <input type="file" id="file-input" accept=".csv" />
-  <button id="import-btn">Import File</button>
-  <p id="status"></p>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
 
-  <script type="module">
-    import './src/firebase.js';
-    import './src/data.js';
-  </script>
+    <div id="app-container" class="w-full max-w-2xl">
+        <div class="form-container bg-gray-800 p-8 rounded-xl shadow-2xl border border-gray-700">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-cyan-400">Term & Definition Importer</h1>
+                <p class="text-gray-400 mt-2">Add data that will appear in the Energy Orbs experience.</p>
+                <div id="auth-status" class="mt-4 text-sm text-gray-500">Connecting...</div>
+            </div>
+
+            <form id="term-form" class="space-y-6">
+                <div>
+                    <label for="term" class="block text-sm font-medium text-gray-300 mb-1">Term</label>
+                    <input type="text" id="term" name="term" required class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" placeholder="e.g., Photosynthesis">
+                </div>
+
+                <div id="definitions-container" class="space-y-4">
+                    <!-- Definition blocks will be added here -->
+                </div>
+
+                <div class="flex justify-between items-center">
+                    <button type="button" id="add-definition-btn" class="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white font-semibold rounded-lg shadow-md transition-colors">Add Definition</button>
+                    <button type="submit" id="save-term-btn" class="px-6 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg shadow-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed">
+                        <span id="save-btn-text">Save Term to Database</span>
+                        <span id="save-spinner" class="hidden">Saving...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+        <div id="status-message" class="mt-6 text-center text-lg"></div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // Assume environment variables are provided
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // --- UI Elements ---
+        const authStatusEl = document.getElementById('auth-status');
+        const addDefinitionBtn = document.getElementById('add-definition-btn');
+        const definitionsContainer = document.getElementById('definitions-container');
+        const termForm = document.getElementById('term-form');
+        const saveTermBtn = document.getElementById('save-term-btn');
+        const saveBtnText = document.getElementById('save-btn-text');
+        const saveSpinner = document.getElementById('save-spinner');
+        const statusMessage = document.getElementById('status-message');
+        const termInput = document.getElementById('term');
+        
+        // --- Firebase Initialization ---
+        let db, auth;
+        let currentUserId = null;
+        let definitionCounter = 0;
+
+        function initializeFirebase() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                handleAuthentication();
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                authStatusEl.textContent = "Error: Could not initialize Firebase.";
+                authStatusEl.classList.replace('text-gray-500', 'text-red-500');
+            }
+        }
+
+        function handleAuthentication() {
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    currentUserId = user.uid;
+                    console.log("Authenticated with User ID:", currentUserId);
+                    authStatusEl.textContent = `Authenticated (User ID: ${currentUserId.substring(0, 10)}...)`;
+                    authStatusEl.classList.replace('text-gray-500', 'text-green-500');
+                    saveTermBtn.disabled = false;
+                } else {
+                     // No user is signed in. Attempt to sign in.
+                    try {
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                         console.error("Authentication failed:", error);
+                         authStatusEl.textContent = "Authentication failed. Please refresh.";
+                         authStatusEl.classList.replace('text-gray-500', 'text-red-500');
+                         saveTermBtn.disabled = true;
+                    }
+                }
+            });
+        }
+        
+        // --- Dynamic Form Logic ---
+        function addDefinitionBlock() {
+            definitionCounter++;
+            const block = document.createElement('div');
+            block.className = 'definition-block bg-gray-700 p-4 rounded-lg border border-gray-600';
+            block.innerHTML = `
+                <label class="block text-sm font-medium text-gray-300 mb-1">Definition ${definitionCounter}</label>
+                <textarea required class="definition-text w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-cyan-500" rows="3" placeholder="Explain the term..."></textarea>
+                <label class="block text-sm font-medium text-gray-300 mt-2 mb-1">Tags (comma-separated)</label>
+                <input type="text" class="definition-tags w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-cyan-500" placeholder="e.g., biology, science, plant">
+            `;
+            definitionsContainer.appendChild(block);
+        }
+
+        // --- Form Submission Logic ---
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            if (!currentUserId) {
+                showStatusMessage("Error: Not authenticated. Please wait or refresh.", true);
+                return;
+            }
+
+            setLoadingState(true);
+
+            const term = termInput.value.trim();
+            const definitions = [];
+            const definitionBlocks = definitionsContainer.querySelectorAll('.definition-block');
+
+            definitionBlocks.forEach(block => {
+                const text = block.querySelector('.definition-text').value.trim();
+                const tagsRaw = block.querySelector('.definition-tags').value.trim();
+                const tags = tagsRaw ? tagsRaw.split(',').map(tag => tag.trim()) : [];
+                
+                if(text) { // Only add definitions that have text
+                    definitions.push({ text, tags });
+                }
+            });
+
+            if (!term || definitions.length === 0) {
+                showStatusMessage("Error: Please provide a term and at least one definition.", true);
+                setLoadingState(false);
+                return;
+            }
+            
+            try {
+                const termsCollectionRef = collection(db, `artifacts/${appId}/public/data/terms`);
+                const docRef = await addDoc(termsCollectionRef, {
+                    term: term,
+                    definitions: definitions,
+                    createdAt: serverTimestamp(),
+                    createdBy: currentUserId
+                });
+                console.log("Document written with ID: ", docRef.id);
+                showStatusMessage(`'${term}' was successfully added! You can now see it in the Orb viewer.`, false);
+                termForm.reset();
+                definitionsContainer.innerHTML = '';
+                addDefinitionBlock(); // Add a fresh block for the next entry
+            } catch (error) {
+                console.error("Error adding document: ", error);
+                showStatusMessage(`Error: Could not save the term. ${error.message}`, true);
+            } finally {
+                setLoadingState(false);
+            }
+        }
+        
+        function setLoadingState(isLoading) {
+            if (isLoading) {
+                saveTermBtn.disabled = true;
+                saveBtnText.classList.add('hidden');
+                saveSpinner.classList.remove('hidden');
+            } else {
+                saveTermBtn.disabled = false;
+                saveBtnText.classList.remove('hidden');
+                saveSpinner.classList.add('hidden');
+            }
+        }
+
+        function showStatusMessage(message, isError = false) {
+            statusMessage.textContent = message;
+            statusMessage.className = `mt-6 text-center text-lg ${isError ? 'text-red-400' : 'text-green-400'}`;
+            
+            // Hide the message after 5 seconds
+            setTimeout(() => {
+                statusMessage.textContent = '';
+            }, 5000);
+        }
+
+        // --- Event Listeners ---
+        addDefinitionBtn.addEventListener('click', addDefinitionBlock);
+        termForm.addEventListener('submit', handleFormSubmit);
+
+        // --- Initial Setup ---
+        window.onload = () => {
+            initializeFirebase();
+            addDefinitionBlock(); // Start with one definition block
+            saveTermBtn.disabled = true; // Disabled until authenticated
+        };
+    </script>
 </body>
 </html>
