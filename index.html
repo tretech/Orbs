@@ -323,34 +323,35 @@
 
   // proceed to fetch from Firestore and populate rows...
       }
+let adminVisible = false;
 
-    document.addEventListener('keydown', e => {
-      if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'a') {
-        admin.style.display = (admin.style.display === 'none' || admin.style.display === '') ? 'flex' : 'none';
-        adminSound.play();
-      } else if (getComputedStyle(term).display === 'block') {
-        if (e.key.length === 1) {
-          input += e.key;
-        } else if (e.key === 'Backspace') {
-          input = input.slice(0, -1);
-        } else if (e.key === 'Enter') {
-          if (input.toLowerCase() === 'run') {
-            term.style.display = 'none';
-            explore.style.display = 'block';
-            orbManager.style.display = 'block';
-            const randomIndex = Math.floor(Math.random() * 16) + 1;
-            bootSound.src = `boot${randomIndex}.mp3`;
-            bootSound.play().catch(err => console.log("Boot sound error:", err));
-
-          }
-          input = '';
-        }
-        inputEl.textContent = input;
-      } else if (e.key === '`') {
-        devConsole.style.display = devConsole.style.display === 'block' ? 'none' : 'block';
-        consoleInput.focus();
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'a') {
+    adminVisible = !adminVisible;
+    admin.style.display = adminVisible ? 'flex' : 'none';
+    adminSound.play();
+  } else if (getComputedStyle(term).display === 'block') {
+    if (e.key.length === 1) {
+      input += e.key;
+    } else if (e.key === 'Backspace') {
+      input = input.slice(0, -1);
+    } else if (e.key === 'Enter') {
+      if (input.toLowerCase() === 'run') {
+        term.style.display = 'none';
+        explore.style.display = 'block';
+        orbManager.style.display = 'block';
+        const randomIndex = Math.floor(Math.random() * 16) + 1;
+        bootSound.src = `boot${randomIndex}.mp3`;
+        bootSound.play().catch(err => console.log("Boot sound error:", err));
       }
-    });
+      input = '';
+    }
+    inputEl.textContent = input;
+  } else if (e.key === '`') {
+    devConsole.style.display = devConsole.style.display === 'block' ? 'none' : 'block';
+    consoleInput.focus();
+  }
+});
 
     consoleInput.addEventListener('keydown', e => {
       if (e.key === 'Enter') {
