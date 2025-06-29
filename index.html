@@ -83,12 +83,14 @@
     </div>
 
     <!-- Papa Parse for CSV parsing - Loaded as a regular script before the module script -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- Switched to jsdelivr CDN - if issues persist, the library itself might be incompatible with the environment. -->
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // Import all necessary Firestore functions, including 'collection'
         import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, serverTimestamp, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         // Three.js for 3D visualization
         import * as THREE from "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.min.js";
@@ -290,7 +292,7 @@
                 await import('./js/admin.js').then(module => {
                     // Pass Firebase instances and app/user info, and the modal function to the admin module
                     // Pass window.Papa because PapaParse is now loaded as a global script.
-                    module.initAdmin(db, auth, appId, currentUserId, serverTimestamp, window.Papa, showConfirmModal);
+                    module.initAdmin(db, auth, appId, currentUserId, serverTimestamp, window.Papa, showConfirmModal, collection, query, where, addDoc, getDocs, doc, updateDoc, deleteDoc);
                 }).catch(error => {
                     console.error("Error loading admin.js:", error);
                     const statusMsgEl = document.getElementById('status-message');
