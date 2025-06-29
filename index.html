@@ -268,13 +268,6 @@
   <!-- Sounds -->
   <audio id="bootSound" preload="auto"></audio>
   <audio id="adminSound" src="admin.mp3" preload="auto"></audio>
-  <div id="term-table-container">
-    <table>
-      <tbody id="term-table-body">
-        <!-- Rows will be inserted here dynamically -->
-      </tbody>
-    </table>
-  </div>
   <script>
    import { getDocs, collection } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -333,7 +326,7 @@
 
     document.addEventListener('keydown', e => {
       if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'a') {
-        admin.style.display = 'flex';
+        admin.style.display = (admin.style.display === 'none' || admin.style.display === '') ? 'flex' : 'none';
         adminSound.play();
       } else if (getComputedStyle(term).display === 'block') {
         if (e.key.length === 1) {
