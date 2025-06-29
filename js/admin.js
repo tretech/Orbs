@@ -23,11 +23,12 @@ let definitionCounter = 0; // Tracks the number of definition blocks in the form
 let termsCollectionRef; // Reference to the Firestore terms collection
 
 // Define expected and alternative column headers for rehash logic
+// These are now indicators rather than direct mappings for flexible parsing.
 const COLUMN_MAPPINGS = {
-    'term': ['Term', 'Concept', 'Word', 'Name'],
-    'note': ['Note', 'Description', 'Summary'],
-    'definition': ['Definition', 'Meaning', 'def', 'Explanation'],
-    'tags': ['Tags', 'Keywords', 'Categories']
+    'term_indicators': ['term', 'concept', 'word', 'name'],
+    'note_indicators': ['note', 'description', 'summary'],
+    'definition_indicators': ['definition', 'meaning', 'def', 'deff', 'explanation'], // Matches 'def' from user's CSV
+    'tag_indicators': ['tags', 'keywords', 'categories', 'tag'] // Matches 'tag' from user's CSV
 };
 
 /**
@@ -125,7 +126,8 @@ async function displayTermsMatrix() {
             `;
         });
         termsMatrixBody.innerHTML = html;
-    } catch (error) {
+    }
+    catch (error) {
         console.error("Error fetching terms for matrix:", error);
         termsMatrixBody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-red-400">Error loading terms: ${error.message}</td></tr>`;
     }
@@ -201,7 +203,10 @@ async function handleSaveTerm(event) {
                 incomingDefinitions.push({
                     text: definitionText,
                     tags: tagsArray,
-                    origin: 'manual' // Default origin for manual entry
+                    origin: 'manual', // Default origin for manual entry
+                    // Using client-side timestamp for definitions within array
+                    createdAt: new Date().toISOString(),
+                    modified: new Date().toISOString()
                 });
             }
         });
@@ -234,14 +239,14 @@ async function handleSaveTerm(event) {
             if (existingDefIndex !== -1) {
                 // Definition exists, check if tags need merging/updating
                 const existingDef = definitionsToSave[existingDefIndex];
-                const mergedTags = Array.from(new Set([...existingDef.tags, ...newDef.tags])); // Merge tags, remove duplicates
+                const mergedTags = Array.from(new Set([...(existingDef.tags || []), ...newDef.tags])); // Merge tags, remove duplicates
 
                 if (existingDef.tags.length !== mergedTags.length || !existingDef.tags.every(tag => mergedTags.includes(tag))) {
                     // Tags have changed or new tags added
                     definitionsToSave[existingDefIndex] = {
                         ...existingDef,
                         tags: mergedTags,
-                        modified: _serverTimestamp()
+                        modified: new Date().toISOString() // Client-side timestamp for definition update
                     };
                     definitionsUpdatedCount++;
                 }
@@ -249,15 +254,15 @@ async function handleSaveTerm(event) {
                 // New definition
                 definitionsToSave.push({
                     ...newDef,
-                    createdAt: _serverTimestamp(),
-                    modified: _serverTimestamp() // Also add modified for new definitions
+                    createdAt: new Date().toISOString(), // Client-side timestamp for new definition
+                    modified: new Date().toISOString() // Also add modified for new definitions
                 });
                 definitionsAddedCount++;
             }
         });
 
         const totalIndexDefs = definitionsToSave.length;
-        const totalIndexTags = definitionsToSave.reduce((acc, def) => acc + def.tags.length, 0);
+        const totalIndexTags = definitionsToSave.reduce((acc, def) => acc + (def.tags ? def.tags.length : 0), 0); // Handle potential undefined tags
 
         const termDataToSave = {
             term: termName,
@@ -265,9 +270,9 @@ async function handleSaveTerm(event) {
             indexDefs: totalIndexDefs,
             indexTags: totalIndexTags,
             definitions: definitionsToSave,
-            updatedAt: _serverTimestamp(),
+            updatedAt: _serverTimestamp(), // Top-level term update timestamp
             // createdBy and createdAt are set only for truly new terms
-            ...(termId ? {} : { createdBy: _currentUserId, createdAt: _serverTimestamp() })
+            ...(termId ? {} : { createdBy: _currentUserId, createdAt: _serverTimestamp() }) // Top-level term creation timestamp
         };
 
         if (termId) {
@@ -310,39 +315,55 @@ async function handleSaveTerm(event) {
  * @returns {object|null} - A rehashed row object with standard keys, or null if essential data is missing.
  */
 function rehashCsvRow(row, headers) {
-    const rehashedRow = {};
+    const rehashedRow = {
+        term: '',
+        note: '',
+        definitionTexts: [], // To collect all definition values from definition-like columns
+        allTags: new Set()   // To collect all unique tags from tag-like columns
+    };
     let termFound = false;
-    let definitionFound = false;
+    let definitionFound = false; // To ensure at least one definition is found
 
-    for (const internalKey in COLUMN_MAPPINGS) {
-        const possibleHeaders = COLUMN_MAPPINGS[internalKey];
-        for (const header of possibleHeaders) {
-            // Check original header casing and lowercase version
-            if (row[header] !== undefined) {
-                rehashedRow[internalKey] = String(row[header]).trim();
-                if (internalKey === 'term' && rehashedRow[internalKey] !== '') termFound = true;
-                if (internalKey === 'definition' && rehashedRow[internalKey] !== '') definitionFound = true;
-                break; // Found a match for this internal key, move to next
-            }
-            // Check case-insensitive match
-            const caseInsensitiveHeader = headers.find(h => h.toLowerCase() === header.toLowerCase());
-            if (caseInsensitiveHeader && row[caseInsensitiveHeader] !== undefined) {
-                 rehashedRow[internalKey] = String(row[caseInsensitiveHeader]).trim();
-                 if (internalKey === 'term' && rehashedRow[internalKey] !== '') termFound = true;
-                 if (internalKey === 'definition' && rehashedRow[internalKey] !== '') definitionFound = true;
-                 break;
+    headers.forEach(header => {
+        const lowerHeader = header.toLowerCase();
+        const value = String(row[header] || '').trim();
+
+        // Check for Term
+        if (!termFound && COLUMN_MAPPINGS.term_indicators.some(indicator => lowerHeader === indicator)) {
+            rehashedRow.term = value;
+            if (value !== '') termFound = true;
+        }
+        // Check for Note
+        else if (COLUMN_MAPPINGS.note_indicators.some(indicator => lowerHeader === indicator)) {
+            rehashedRow.note = value;
+        }
+        // Check for Definitions
+        else if (COLUMN_MAPPINGS.definition_indicators.some(indicator => lowerHeader.includes(indicator))) {
+            if (value !== '') {
+                rehashedRow.definitionTexts.push(value);
+                definitionFound = true; // At least one definition text found
             }
         }
-        // If no matching header found, set to empty string
-        if (rehashedRow[internalKey] === undefined) {
-            rehashedRow[internalKey] = '';
+        // Check for Tags
+        else if (COLUMN_MAPPINGS.tag_indicators.some(indicator => lowerHeader.includes(indicator))) {
+            if (value !== '') {
+                value.split(',').forEach(tag => {
+                    const trimmedTag = tag.trim();
+                    if (trimmedTag) {
+                        rehashedRow.allTags.add(trimmedTag);
+                    }
+                });
+            }
         }
-    }
+    });
 
-    // Critical validation: A term and at least one definition are required for a valid entry
-    if (!termFound || !definitionFound) {
+    // Final validation: A term and at least one definition text are required
+    if (!termFound || rehashedRow.term === '' || !definitionFound || rehashedRow.definitionTexts.length === 0) {
         return null; // This row cannot be meaningfully rehashed or is incomplete
     }
+
+    // Convert Set of tags to an Array
+    rehashedRow.allTags = Array.from(rehashedRow.allTags);
 
     return rehashedRow;
 }
@@ -395,54 +416,51 @@ async function processCsvFile(file, fileName, importStatusMessage) {
         const actualHeaders = parsedData.length > 0 ? Object.keys(parsedData[0]) : [];
         console.log("Actual CSV Headers:", actualHeaders);
 
-        const rehashedData = [];
+        const rehashedAndValidatedData = [];
         let rowsSkippedDueToRehash = 0;
         parsedData.forEach((row, index) => {
             const rehashedRow = rehashCsvRow(row, actualHeaders);
             if (rehashedRow) {
-                rehashedData.push(rehashedRow);
+                rehashedAndValidatedData.push(rehashedRow);
             } else {
                 rowsSkippedDueToRehash++;
-                console.warn(`Skipped row ${index + 1} due to insufficient data after rehash:`, row);
+                console.warn(`Skipped row ${index + 1} due to insufficient data or unmappable columns after rehash:`, row);
             }
         });
 
-        console.log("Rehashed Data:", rehashedData);
-        if (rehashedData.length === 0) {
+        console.log("Rehashed and Validated Data (ready for grouping):", rehashedAndValidatedData);
+        if (rehashedAndValidatedData.length === 0) {
              importStatusMessage.textContent = `No valid terms found in the CSV file after rehash. ${rowsSkippedDueToRehash} rows skipped.`;
              importStatusMessage.classList.replace('text-yellow-400', 'text-red-500');
              return;
         }
 
 
-        importStatusMessage.textContent = `Processing ${rehashedData.length} valid rows from "${fileName}"...`;
+        importStatusMessage.textContent = `Processing ${rehashedAndValidatedData.length} valid rows from "${fileName}"...`;
 
-        // Group data by term, assuming one row per definition for a term after rehash
+        // Group data by term, assuming a single row can provide multiple definitions for one term
         const termsToProcess = {};
-        rehashedData.forEach(row => {
+        rehashedAndValidatedData.forEach(row => {
             const termName = row.term; // Use the rehashed 'term' key
             if (!termsToProcess[termName]) {
                 termsToProcess[termName] = {
                     term: termName,
                     note: row.note, // Use rehashed 'note' key
-                    definitions: []
+                    definitions: [] // This will store the final definition objects
                 };
             }
 
-            const definitionText = row.definition; // Use rehashed 'definition' key
-            const tagsInput = row.tags; // Use rehashed 'tags' key
-            const tagsArray = tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
-
-            if (definitionText) {
+            // For each definition text found in the row, create a definition object
+            row.definitionTexts.forEach(defText => {
                 termsToProcess[termName].definitions.push({
-                    text: definitionText,
-                    tags: tagsArray,
+                    text: defText,
+                    tags: row.allTags, // Apply all tags collected from the row to each definition
                     origin: fileName // Origin from the imported file
                 });
-            }
+            });
         });
 
-        console.log("Terms grouped for processing:", termsToProcess);
+        console.log("Terms grouped for processing (before Firestore merge):", termsToProcess);
         if (Object.keys(termsToProcess).length === 0) {
             importStatusMessage.textContent = 'No valid terms found in the CSV file after grouping parsed data.';
             importStatusMessage.classList.replace('text-yellow-400', 'text-red-500');
@@ -484,14 +502,15 @@ async function processCsvFile(file, fileName, importStatusMessage) {
                 if (existingDefIndex !== -1) {
                     // Definition text is a duplicate. Check and merge tags.
                     const existingDef = definitionsForFirestore[existingDefIndex];
-                    const mergedTags = Array.from(new Set([...(existingDef.tags || []), ...newDef.tags])); // Ensure tags array exists before spread
+                    // Ensure existingDef.tags is an array before spreading
+                    const mergedTags = Array.from(new Set([...(existingDef.tags || []), ...newDef.tags]));
 
                     if (existingDef.tags.length !== mergedTags.length || !existingDef.tags.every(tag => mergedTags.includes(tag))) {
                         // Tags have changed or new tags added
                         definitionsForFirestore[existingDefIndex] = {
                             ...existingDef,
                             tags: mergedTags,
-                            modified: _serverTimestamp() // Mark as modified
+                            modified: new Date().toISOString() // Client-side timestamp for definition update
                         };
                         definitionsUpdated++;
                         termWasUpdated = true;
@@ -502,8 +521,8 @@ async function processCsvFile(file, fileName, importStatusMessage) {
                     // New definition
                     definitionsForFirestore.push({
                         ...newDef,
-                        createdAt: _serverTimestamp(),
-                        modified: _serverTimestamp() // Also mark new definitions as modified
+                        createdAt: new Date().toISOString(), // Client-side timestamp for new definition
+                        modified: new Date().toISOString() // Also add modified for new definitions
                     });
                     definitionsAdded++;
                     termWasUpdated = true;
