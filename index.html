@@ -10,6 +10,41 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- Main application stylesheet -->
     <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* Ensure the canvas container takes full available space */
+        #orb-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative; /* Needed for absolute positioning of canvas */
+        }
+        #orb-container canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .explorer-content-wrapper {
+            width: 100%;
+            height: calc(100vh - 4rem); /* Full height minus header height */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start; /* Align content to the top */
+            padding-top: 2rem; /* Add some padding from the top */
+        }
+        .command-line-input {
+            background-color: #2d3748;
+            border: 1px solid #4a5568;
+            color: #edf2f7;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            width: 90%; /* Adjust width */
+            max-width: 600px; /* Max width */
+            margin-top: 1rem; /* Space from canvas */
+        }
+    </style>
 </head>
 <body class="antialiased">
 
@@ -51,6 +86,8 @@
         import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, serverTimestamp, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         // Papa Parse for CSV parsing - Imported as a side-effect to make 'Papa' available globally
         import "https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js";
+        // Three.js for 3D visualization
+        import * as THREE from "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.min.js";
 
 
         // --- Firebase Configuration ---
@@ -256,11 +293,26 @@
 
             } else if (mode === 'explorer') {
                 appContentDiv.innerHTML = `
-                    <h2 class="text-2xl font-semibold mb-4 text-blue-300">Explorer Mode</h2>
-                    <p class="text-lg text-gray-300">Discover and interact with terms, rendered as dynamic orbs.</p>
-                    <p class="text-gray-500 mt-4"> (Keyboard commands like 'run:' for launching will be implemented here) </p>
+                    <div class="explorer-content-wrapper">
+                        <h2 class="text-2xl font-semibold mb-4 text-blue-300">Explorer Mode</h2>
+                        <p class="text-lg text-gray-300 mb-4">Discover and interact with terms, rendered as dynamic orbs.</p>
+                        <div id="orb-container" class="w-full h-96 bg-gray-900 rounded-lg shadow-inner flex justify-center items-center">
+                            <p class="text-gray-500">Loading orbs...</p>
+                        </div>
+                        <input type="text" id="command-line-input" class="command-line-input mt-4" placeholder="Type 'run: [command]' here...">
+                        <p class="text-sm text-gray-400 mt-2"> (Keyboard commands like 'run:' for launching will be implemented here) </p>
+                    </div>
                 `;
-                // TODO: Load and execute explorer-specific script here: import('./js/explorer.js');
+                // Load and execute explorer-specific script
+                await import('./js/explorer.js').then(module => {
+                    module.initExplorer(db, auth, appId, currentUserId, THREE);
+                }).catch(error => {
+                    console.error("Error loading explorer.js:", error);
+                    const orbContainer = document.getElementById('orb-container');
+                    if (orbContainer) {
+                        orbContainer.innerHTML = '<p class="text-red-400">Error loading Orb Explorer. Check console.</p>';
+                    }
+                });
             }
             // Ensure save button state is correct after content load
             // This relies on auth.currentUser being updated, which happens asynchronously.
