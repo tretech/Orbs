@@ -229,7 +229,22 @@
       document.getElementById('orbList').appendChild(orb);
       console.log(orb);
     }
-
+    <div id="term-table-container" class="mt-10 bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-lg">
+      <h2 class="text-xl font-semibold text-cyan-400 mb-4">Current Terms in Database</h2>
+      <div class="overflow-auto max-h-96">
+        <table class="w-full text-sm text-left text-gray-300">
+          <thead class="text-xs uppercase bg-gray-700 text-gray-400">
+            <tr>
+              <th scope="col" class="px-4 py-3">Term</th>
+              <th scope="col" class="px-4 py-3">Note</th>
+              <th scope="col" class="px-4 py-3">Definitions</th>
+              <th scope="col" class="px-4 py-3">Tags</th>
+            </tr>
+          </thead>
+          <tbody id="term-table-body" class="text-white bg-gray-900 divide-y divide-gray-700"></tbody>
+        </table>
+      </div>
+    </div>
 
     function resetOrbs() {
       orbCount = 0;
@@ -253,22 +268,68 @@
   <!-- Sounds -->
   <audio id="bootSound" preload="auto"></audio>
   <audio id="adminSound" src="admin.mp3" preload="auto"></audio>
-
+  <div id="term-table-container">
+    <table>
+      <tbody id="term-table-body">
+        <!-- Rows will be inserted here dynamically -->
+      </tbody>
+    </table>
+  </div>
   <script>
-  document.addEventListener('DOMContentLoaded', () => {
-    let input = '';
-    const inputEl = document.getElementById('input');
-    const term = document.getElementById('terminal');
-    const explore = document.getElementById('explore');
-    const admin = document.getElementById('admin');
-    admin.style.display = 'none'; // Force-hide Admin Mode at page load
-    const bootSound = document.getElementById('bootSound');
-    const adminSound = document.getElementById('adminSound');
-    const devConsole = document.getElementById('devConsole');
-    const orbManager = document.getElementById('orbManager');
-    const typewriter = document.getElementById('typewriter');
-    const consoleInput = document.getElementById('consoleInput');
-    const consoleOutput = document.getElementById('consoleOutput');
+   import { getDocs, collection } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    async function fetchTermsAndRender() {
+      const termsRef = collection(db, `artifacts/${appId}/public/data/terms`);
+      const snapshot = await getDocs(termsRef);
+      const tableBody = document.getElementById('term-table-body');
+      tableBody.innerHTML = ''; // Clear old data
+
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const term = data.term || "—";
+        const note = data.note || "";
+        const defs = data.definitions || [];
+
+        const tagSet = new Set();
+        defs.forEach(d => (d.tags || []).forEach(tag => tagSet.add(tag)));
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="px-4 py-3 font-medium text-cyan-300">${term}</td>
+          <td class="px-4 py-3">${note}</td>
+          <td class="px-4 py-3 text-center">${defs.length}</td>
+          <td class="px-4 py-3 text-center">${tagSet.size}</td>
+        `;
+        tableBody.appendChild(tr);
+      });
+    }
+    
+    
+    document.addEventListener('DOMContentLoaded', () => {
+      fetchTermsAndRender();
+      let input = '';
+      const inputEl = document.getElementById('input');
+      const term = document.getElementById('terminal');
+      const explore = document.getElementById('explore');
+      const admin = document.getElementById('admin');
+      admin.style.display = 'none'; // Force-hide Admin Mode at page load
+      const bootSound = document.getElementById('bootSound');
+      const adminSound = document.getElementById('adminSound');
+      const devConsole = document.getElementById('devConsole');
+      const orbManager = document.getElementById('orbManager');
+      const typewriter = document.getElementById('typewriter');
+      const consoleInput = document.getElementById('consoleInput');
+      const consoleOutput = document.getElementById('consoleOutput');
+
+    function fetchTermsAndRender() {
+      const tableBody = document.getElementById('term-table-body');
+        if (!tableBody) {
+          console.warn("⚠️ Could not find #term-table-body. Make sure it's in your HTML.");
+         return;
+      }
+
+  // proceed to fetch from Firestore and populate rows...
+      }
 
     document.addEventListener('keydown', e => {
       if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'a') {
@@ -314,7 +375,6 @@
     document.querySelectorAll('.tile').forEach(tile => {
       tile.addEventListener('click', () => {
         const label = tile.textContent.trim().toUpperCase();
-
         if (label === 'SYSTEM.EXE') {
           alert("Launching system diagnostics... (to be implemented)");
         } else if (label === 'PROJECTS') {
