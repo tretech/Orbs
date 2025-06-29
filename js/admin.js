@@ -26,7 +26,7 @@ let termsCollectionRef; // Reference to the Firestore terms collection
 const COLUMN_MAPPINGS = {
     'term': ['Term', 'Concept', 'Word', 'Name'],
     'note': ['Note', 'Description', 'Summary'],
-    'definition': ['Definition', 'Meaning', 'deff', 'Explanation'],
+    'definition': ['Definition', 'Meaning', 'def', 'Explanation'],
     'tags': ['Tags', 'Keywords', 'Categories']
 };
 
