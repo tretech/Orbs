@@ -1,0 +1,95 @@
+/* css/style.css */
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #1a202c; /* Dark background */
+    color: #e2e8f0; /* Light text */
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+}
+
+/* Header and Navigation */
+.header {
+    background-color: #2d3748;
+    padding: 1rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-left: 1.5rem; /* px-6 equivalent */
+    padding-right: 1.5rem; /* px-6 equivalent */
+}
+
+.nav-button {
+    padding: 0.75rem 1.5rem;
+    margin: 0 0.5rem;
+    border-radius: 0.5rem;
+    background-color: #4a5568;
+    color: #edf2f7;
+    font-weight: 600;
+    transition: background-color 0.2s;
+    cursor: pointer;
+}
+
+.nav-button:hover {
+    background-color: #636b6f;
+}
+
+/* Content Area */
+.content-area {
+    flex-grow: 1;
+    padding: 2rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.rounded-card {
+    background-color: #2d3748;
+    padding: 2rem;
+    border-radius: 1rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    max-width: 800px;
+    width: 100%;
+}
+
+/* Form Specific Styles */
+.definition-block {
+    background-color: #3b4556; /* Slightly lighter gray for definition blocks */
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid #4a5568;
+}
+
+/* Input/Textarea common styles */
+.w-full.bg-gray-600.border.border-gray-500.rounded-md.px-3.py-2.text-white.focus\:outline-none.focus\:ring-1.focus\:ring-cyan-500 {
+    background-color: #4a5568;
+    border-color: #636b6f;
+    color: #edf2f7;
+}
+
+.w-full.bg-gray-600.border.border-gray-500.rounded-md.px-3.py-2.text-white.focus\:outline-none.focus\:ring-1.focus\:ring-cyan-500:focus {
+    outline: none;
+    ring-color: #06b6d4; /* cyan-500 */
+    border-color: #06b6d4;
+}
+
+/* Spinner for save button */
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
