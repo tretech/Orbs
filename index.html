@@ -3,60 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Orbs Project</title>
-    <!-- Tailwind CSS CDN for styling -->
+    <title>Orbs System</title>
+    <!-- Tailwind CSS CDN for styling - For production, install as a PostCSS plugin: https://tailwindcss.com/docs/installation -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Inter Font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #1a202c; /* Dark background */
-            color: #e2e8f0; /* Light text */
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-            margin: 0;
-            padding: 0;
-        }
-        /* Basic styling for conceptual header/navigation */
-        .header {
-            background-color: #2d3748;
-            padding: 1rem;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-            border-bottom-left-radius: 10px;
-            border-bottom-right-radius: 10px;
-        }
-        .nav-button {
-            padding: 0.75rem 1.5rem;
-            margin: 0 0.5rem;
-            border-radius: 0.5rem;
-            background-color: #4a5568;
-            color: #edf2f7;
-            font-weight: 600;
-            transition: background-color 0.2s;
-            cursor: pointer;
-        }
-        .nav-button:hover {
-            background-color: #636b6f;
-        }
-        .content-area {
-            flex-grow: 1;
-            padding: 2rem;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-        }
-        .rounded-card {
-            background-color: #2d3748;
-            padding: 2rem;
-            border-radius: 1rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            max-width: 800px;
-            width: 100%;
-        }
-    </style>
+    <!-- Main application stylesheet - TODO: Move all inline styles here -->
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="antialiased">
 
@@ -70,6 +23,7 @@
 
     <main class="content-area">
         <div id="app-content" class="rounded-card">
+            <!-- Content will be loaded dynamically here -->
             <h2 class="text-2xl font-semibold mb-4">Welcome to Orbs!</h2>
             <p class="text-lg text-gray-300">Select a mode above to begin.</p>
             <p class="text-sm text-gray-400 mt-6">Firebase Status: <span id="firebase-status" class="text-yellow-400">Initializing...</span></p>
@@ -81,17 +35,45 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Global variables provided by the Canvas environment
+        // IMPORTANT: When running outside the Canvas environment (e.g., from GitHub),
+        // the global variables __app_id, __firebase_config, and __initial_auth_token will be undefined.
+        // You MUST replace the placeholder firebaseConfig with your actual project details for Firebase to initialize correctly.
+
+        // Determines the application ID. Defaults to 'default-app-id' if not provided by Canvas.
+        // If you are running from GitHub, consider explicitly setting a unique ID here
+        // or ensure your Firestore security rules handle 'default-app-id'.
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        
+        let firebaseConfig;
+        if (typeof __firebase_config !== 'undefined') {
+            // This path is taken when running inside the Canvas environment
+            firebaseConfig = JSON.parse(__firebase_config);
+        } else {
+            // This path is taken when running outside Canvas (e.g., from GitHub).
+            // REPLACE THESE PLACEHOLDER VALUES WITH YOUR ACTUAL FIREBASE PROJECT CONFIGURATION.
+            // You can find your config in Firebase Console -> Project settings -> General -> Your apps -> Firebase SDK snippet (Config).
+            firebaseConfig = {
+                apiKey: "YOUR_API_KEY", // e.g., "AIzaSyC..."
+                authDomain: "YOUR_PROJECT_ID.firebaseapp.com", // e.g., "my-orbs-project.firebaseapp.com"
+                projectId: "YOUR_PROJECT_ID", // e.g., "my-orbs-project"
+                storageBucket: "YOUR_PROJECT_ID.appspot.com", // e.g., "my-orbs-project.appspot.com"
+                messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // e.g., "1234567890"
+                appId: "YOUR_APP_ID", // e.g., "1:1234567890:web:abcdef1234567890abcdef"
+                measurementId: "YOUR_MEASUREMENT_ID" // Optional, e.g., "G-XXXXXXXXXX"
+            };
+            console.warn("Firebase config not found from Canvas environment. Using placeholder config. Please update `firebaseConfig` with your actual project details.");
+        }
+
+        // The initial authentication token is provided by Canvas for specific authentication flows.
+        // If running from GitHub, this will be null, and the app will sign in anonymously.
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         let app;
         let db;
         let auth;
-        let userId = 'N/A'; // Default user ID
+        let currentUserId = 'N/A'; // Default user ID until authenticated
 
         /**
          * Initializes Firebase and handles user authentication.
@@ -99,14 +81,15 @@
          */
         async function initializeFirebase() {
             try {
-                // Initialize Firebase app
+                // Initialize Firebase app with the provided or placeholder config
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
 
                 document.getElementById('firebase-status').textContent = 'Authenticating...';
 
-                // Sign in using the custom token if available, otherwise anonymously
+                // Attempt to sign in with a custom token if available (from Canvas environment).
+                // Otherwise, sign in anonymously, which is suitable for public access.
                 if (initialAuthToken) {
                     await signInWithCustomToken(auth, initialAuthToken);
                     console.log('Signed in with custom token.');
@@ -115,48 +98,99 @@
                     console.log('Signed in anonymously.');
                 }
 
-                // Listen for auth state changes to update UI
+                // Listen for authentication state changes to update the UI with the user's ID.
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
-                        userId = user.uid;
+                        // If a user is logged in (authenticated), use their UID.
+                        currentUserId = user.uid;
                         document.getElementById('firebase-status').textContent = 'Authenticated!';
-                        document.getElementById('user-id').textContent = userId;
-                        console.log("Firebase initialized and user signed in:", user.uid);
+                        document.getElementById('user-id').textContent = currentUserId;
+                        console.log("Firebase initialized and user signed in:", currentUserId);
+                        // Make save button active once authenticated
+                        const saveBtn = document.getElementById('save-term-btn');
+                        if (saveBtn) saveBtn.disabled = false;
+
                     } else {
-                        userId = crypto.randomUUID(); // Fallback for unauthenticated scenarios
+                        // If no user is logged in (e.g., anonymous, or not yet authenticated),
+                        // generate a random UUID as a temporary identifier.
+                        currentUserId = crypto.randomUUID();
                         document.getElementById('firebase-status').textContent = 'Not Authenticated (Anonymous)';
-                        document.getElementById('user-id').textContent = userId;
-                        console.log("No user signed in. Using random UUID for user ID:", userId);
+                        document.getElementById('user-id').textContent = currentUserId;
+                        console.log("No user signed in. Using random UUID for user ID:", currentUserId);
+                        const saveBtn = document.getElementById('save-term-btn');
+                        if (saveBtn) saveBtn.disabled = true; // Disable until authenticated
                     }
                 });
 
             } catch (error) {
                 console.error("Error initializing Firebase or authenticating:", error);
-                document.getElementById('firebase-status').textContent = 'Error!';
+                document.getElementById('firebase-status').textContent = 'Error! Check console for details.';
                 document.getElementById('user-id').textContent = 'Error loading user ID.';
             }
         }
 
-        // Function to simulate loading module content
         /**
-         * Simulates loading content for different application modes.
-         * In a full application, this would involve loading separate HTML/JS modules.
+         * Loads content for different application modes (Admin/Explorer).
+         * This function will load appropriate HTML structures and associated JS.
          * @param {string} mode - The mode to load ('admin' or 'explorer').
          */
-        function loadModuleContent(mode) {
+        async function loadModuleContent(mode) {
             const appContentDiv = document.getElementById('app-content');
+            appContentDiv.innerHTML = ''; // Clear existing content
+
             if (mode === 'admin') {
                 appContentDiv.innerHTML = `
                     <h2 class="text-2xl font-semibold mb-4 text-blue-300">Admin Panel</h2>
-                    <p class="text-lg text-gray-300">This is where data ingestion, validation, and term editing will happen.</p>
-                    <p class="text-gray-500 mt-4"> (Ctrl+Alt+A will toggle Admin mode - future implementation) </p>
+                    <p class="text-lg text-gray-300">Manage terms, definitions, and tags.</p>
+                    <div id="admin-form-container" class="mt-8">
+                        <form id="term-form" class="space-y-4 text-left">
+                            <div>
+                                <label for="term" class="block text-sm font-medium text-gray-300 mb-1">Term</label>
+                                <input type="text" id="term" required class="w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-cyan-500" placeholder="e.g., Photosynthesis">
+                            </div>
+                            <div>
+                                <label for="note" class="block text-sm font-medium text-gray-300 mb-1">Note (Optional)</label>
+                                <input type="text" id="note" class="w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-cyan-500" placeholder="e.g., A biology core concept">
+                            </div>
+                            <div id="definitions-container" class="space-y-4">
+                                <!-- Definition blocks will be added here -->
+                            </div>
+                            <button type="button" id="add-definition-btn" class="flex items-center px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 transition-colors">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                Add Definition
+                            </button>
+                            <button type="submit" id="save-term-btn" class="w-full flex items-center justify-center px-4 py-2 bg-green-600 text-white font-bold rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                <span id="save-btn-text">Save Term</span>
+                                <svg id="save-spinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </button>
+                            <p id="status-message" class="mt-4 text-center text-sm"></p>
+                        </form>
+                    </div>
                 `;
+                // Load and execute admin-specific script
+                await import('./js/admin.js').then(module => {
+                    module.initAdmin(db, auth, appId, currentUserId, serverTimestamp);
+                }).catch(error => {
+                    console.error("Error loading admin.js:", error);
+                    document.getElementById('status-message').textContent = 'Error loading Admin features.';
+                    document.getElementById('status-message').classList.replace('text-yellow-400', 'text-red-500');
+                });
+
             } else if (mode === 'explorer') {
                 appContentDiv.innerHTML = `
                     <h2 class="text-2xl font-semibold mb-4 text-blue-300">Explorer Mode</h2>
                     <p class="text-lg text-gray-300">Discover and interact with terms, rendered as dynamic orbs.</p>
                     <p class="text-gray-500 mt-4"> (Keyboard commands like 'run:' for launching will be implemented here) </p>
                 `;
+                // TODO: Load and execute explorer-specific script here: import('./js/explorer.js');
+            }
+            // Ensure save button state is correct after content load
+            const saveBtn = document.getElementById('save-term-btn');
+            if (saveBtn) {
+                saveBtn.disabled = !auth.currentUser;
             }
         }
 
@@ -167,15 +201,13 @@
         // Initialize Firebase when the window loads
         window.onload = initializeFirebase;
 
-        // Conceptual Keyboard Shortcut for Admin Mode (to be fully implemented later)
+        // Keyboard Shortcut for Admin Mode (Part of Phase 5 implementation).
         document.addEventListener('keydown', (event) => {
             if (event.ctrlKey && event.altKey && event.key === 'a') {
-                event.preventDefault(); // Prevent browser default action
+                event.preventDefault(); // Prevent browser default actions (e.g., opening dev tools shortcut).
                 console.log("Ctrl+Alt+A pressed - Admin Mode toggle (conceptual)");
-                // In a full app, this would toggle between admin/explorer views
-                // For now, it just logs and could load the admin content
-                loadModuleContent('admin');
-                // Play adminSound (future implementation)
+                loadModuleContent('admin'); // For now, just load admin content.
+                // TODO: Play adminSound as per requirements.
             }
         });
     </script>
