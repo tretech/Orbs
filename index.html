@@ -56,13 +56,17 @@
         </nav>
     </header>
 
-    <main class="content-area">
-        <div id="app-content" class="rounded-card">
-            <!-- Content will be loaded dynamically here -->
+    <main class="content-area flex-col">
+        <!-- Firebase Status indicators moved outside app-content to be persistent -->
+        <div class="text-sm text-gray-400 mb-4">
+            Firebase Status: <span id="firebase-status" class="text-yellow-400">Initializing...</span> |
+            User ID: <span id="user-id" class="text-yellow-400">N/A</span>
+        </div>
+
+        <div id="app-content" class="rounded-card flex-grow flex flex-col items-center justify-center">
+            <!-- Initial welcome content -->
             <h2 class="text-2xl font-semibold mb-4">Welcome to Orbs!</h2>
             <p class="text-lg text-gray-300">Select a mode above to begin.</p>
-            <p class="text-sm text-gray-400 mt-6">Firebase Status: <span id="firebase-status" class="text-yellow-400">Initializing...</span></p>
-            <p class="text-sm text-gray-400">User ID: <span id="user-id" class="text-yellow-400">N/A</span></p>
         </div>
     </main>
 
@@ -78,21 +82,20 @@
         </div>
     </div>
 
+    <!-- Papa Parse for CSV parsing - Loaded as a regular script before the module script -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, serverTimestamp, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        // Papa Parse for CSV parsing - Imported as a side-effect to make 'Papa' available globally
-        import "https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js";
         // Three.js for 3D visualization
         import * as THREE from "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.min.js";
 
 
         // --- Firebase Configuration ---
-        // REPLACE THESE PLACEHOLDER VALUES WITH YOUR ACTUAL FIREBASE PROJECT CONFIGURATION.
-        // You can find your config in Firebase Console -> Project settings -> General -> Your apps -> Firebase SDK snippet (Config).
+        // Your actual Firebase project configuration details provided:
         const firebaseConfig = {
             apiKey: "AIzaSyCYiaAH3wRzW6557xLJQ6zm9-RuSKBWWuM",
             authDomain: "orbdefine.firebaseapp.com",
@@ -124,7 +127,11 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
 
-                document.getElementById('firebase-status').textContent = 'Authenticating...';
+                // Get references to the status elements outside the dynamic content area
+                const firebaseStatusEl = document.getElementById('firebase-status');
+                const userIdEl = document.getElementById('user-id');
+
+                if (firebaseStatusEl) firebaseStatusEl.textContent = 'Authenticating...';
 
                 // Sign in anonymously for public access.
                 // For production apps, consider more robust authentication methods.
@@ -136,10 +143,10 @@
                     if (user) {
                         // If a user is logged in (authenticated), use their UID.
                         currentUserId = user.uid;
-                        document.getElementById('firebase-status').textContent = 'Authenticated!';
-                        document.getElementById('user-id').textContent = currentUserId;
+                        if (firebaseStatusEl) firebaseStatusEl.textContent = 'Authenticated!';
+                        if (userIdEl) userIdEl.textContent = currentUserId;
                         console.log("Firebase initialized and user signed in:", currentUserId);
-                        // Enable save button once authenticated
+                        // Enable save button once authenticated (if it exists in the current view)
                         const saveBtn = document.getElementById('save-term-btn');
                         if (saveBtn) saveBtn.disabled = false;
 
@@ -147,8 +154,8 @@
                         // This case should ideally not be hit after signInAnonymously,
                         // but handles any potential sign-out or initial states.
                         currentUserId = crypto.randomUUID(); // Fallback for unauthenticated scenarios
-                        document.getElementById('firebase-status').textContent = 'Not Authenticated (Anonymous)';
-                        document.getElementById('user-id').textContent = currentUserId;
+                        if (firebaseStatusEl) firebaseStatusEl.textContent = 'Not Authenticated (Anonymous)';
+                        if (userIdEl) userIdEl.textContent = currentUserId;
                         console.log("No user signed in. Using random UUID for user ID:", currentUserId);
                         const saveBtn = document.getElementById('save-term-btn');
                         if (saveBtn) saveBtn.disabled = true; // Disable until authenticated
@@ -157,8 +164,10 @@
 
             } catch (error) {
                 console.error("Error initializing Firebase or authenticating:", error);
-                document.getElementById('firebase-status').textContent = 'Error! Check console for details.';
-                document.getElementById('user-id').textContent = 'Error loading user ID.';
+                const firebaseStatusEl = document.getElementById('firebase-status');
+                const userIdEl = document.getElementById('user-id');
+                if (firebaseStatusEl) firebaseStatusEl.textContent = 'Error! Check console.';
+                if (userIdEl) userIdEl.textContent = 'Error loading user ID.';
             }
         }
 
@@ -207,7 +216,7 @@
          */
         async function loadModuleContent(mode) {
             const appContentDiv = document.getElementById('app-content');
-            appContentDiv.innerHTML = ''; // Clear existing content
+            appContentDiv.innerHTML = ''; // Clear existing content in the app-content div
 
             if (mode === 'admin') {
                 appContentDiv.innerHTML = `
