@@ -38,21 +38,20 @@
         import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Configuration ---
-        // REPLACE THESE PLACEHOLDER VALUES WITH YOUR ACTUAL FIREBASE PROJECT CONFIGURATION.
-        // You can find your config in Firebase Console -> Project settings -> General -> Your apps -> Firebase SDK snippet (Config).
+        // Your actual Firebase project configuration details provided:
         const firebaseConfig = {
-              apiKey: "AIzaSyCYiaAH3wRzW6557xLJQ6zm9-RuSKBWWuM",
-              authDomain: "orbdefine.firebaseapp.com",
-              projectId: "orbdefine",
-              storageBucket: "orbdefine.firebasestorage.app",
-              messagingSenderId: "247935667317",
-              appId: "1:247935667317:web:2dff8b9b44848553fafc3c",
-              measurementId: "G-0VGTHSL2VZ"
+            apiKey: "AIzaSyCYiaAH3wRzW6557xLJQ6zm9-RuSKBWWuM",
+            authDomain: "orbdefine.firebaseapp.com",
+            projectId: "orbdefine",
+            storageBucket: "orbdefine.firebasestorage.app",
+            messagingSenderId: "247935667317",
+            appId: "1:247935667317:web:2dff8b9b44848553fafc3c",
+            measurementId: "G-0VGTHSL2VZ" // Optional
         };
 
         // Application ID for Firestore collection paths (e.g., /artifacts/your-app-id/public/data/terms)
         // You can customize this string.
-        const appId = 'default-orbs-app-id';
+        const appId = 'default-orbs-app-id'; // Using a default app ID for the collection path
 
         // --- Firebase Instances ---
         let app;
