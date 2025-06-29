@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Orbs System</title>
-    <!-- Tailwind CSS CDN for styling - For production, install as a PostCSS plugin: https://tailwindcss.com/docs/installation -->
+    <!-- Tailwind CSS CDN for development. For production, install as a PostCSS plugin: https://tailwindcss.com/docs/installation -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Inter Font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <!-- Main application stylesheet - TODO: Move all inline styles here -->
+    <!-- Main application stylesheet -->
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="antialiased">
@@ -34,42 +34,27 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // IMPORTANT: When running outside the Canvas environment (e.g., from GitHub),
-        // the global variables __app_id, __firebase_config, and __initial_auth_token will be undefined.
-        // You MUST replace the placeholder firebaseConfig with your actual project details for Firebase to initialize correctly.
+        // --- Firebase Configuration ---
+        // REPLACE THESE PLACEHOLDER VALUES WITH YOUR ACTUAL FIREBASE PROJECT CONFIGURATION.
+        // You can find your config in Firebase Console -> Project settings -> General -> Your apps -> Firebase SDK snippet (Config).
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY", // e.g., "AIzaSyC..."
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com", // e.g., "my-orbs-project.firebaseapp.com"
+            projectId: "YOUR_PROJECT_ID", // e.g., "my-orbs-project"
+            storageBucket: "YOUR_PROJECT_ID.appspot.com", // e.g., "my-orbs-project.appspot.com"
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // e.g., "1234567890"
+            appId: "YOUR_APP_ID", // e.g., "1:1234567890:web:abcdef1234567890abcdef"
+            measurementId: "YOUR_MEASUREMENT_ID" // Optional, e.g., "G-XXXXXXXXXX"
+        };
 
-        // Determines the application ID. Defaults to 'default-app-id' if not provided by Canvas.
-        // If you are running from GitHub, consider explicitly setting a unique ID here
-        // or ensure your Firestore security rules handle 'default-app-id'.
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        
-        let firebaseConfig;
-        if (typeof __firebase_config !== 'undefined') {
-            // This path is taken when running inside the Canvas environment
-            firebaseConfig = JSON.parse(__firebase_config);
-        } else {
-            // This path is taken when running outside Canvas (e.g., from GitHub).
-            // REPLACE THESE PLACEHOLDER VALUES WITH YOUR ACTUAL FIREBASE PROJECT CONFIGURATION.
-            // You can find your config in Firebase Console -> Project settings -> General -> Your apps -> Firebase SDK snippet (Config).
-            firebaseConfig = {
-                apiKey: "YOUR_API_KEY", // e.g., "AIzaSyC..."
-                authDomain: "YOUR_PROJECT_ID.firebaseapp.com", // e.g., "my-orbs-project.firebaseapp.com"
-                projectId: "YOUR_PROJECT_ID", // e.g., "my-orbs-project"
-                storageBucket: "YOUR_PROJECT_ID.appspot.com", // e.g., "my-orbs-project.appspot.com"
-                messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // e.g., "1234567890"
-                appId: "YOUR_APP_ID", // e.g., "1:1234567890:web:abcdef1234567890abcdef"
-                measurementId: "YOUR_MEASUREMENT_ID" // Optional, e.g., "G-XXXXXXXXXX"
-            };
-            console.warn("Firebase config not found from Canvas environment. Using placeholder config. Please update `firebaseConfig` with your actual project details.");
-        }
+        // Application ID for Firestore collection paths (e.g., /artifacts/your-app-id/public/data/terms)
+        // You can customize this string.
+        const appId = 'default-orbs-app-id';
 
-        // The initial authentication token is provided by Canvas for specific authentication flows.
-        // If running from GitHub, this will be null, and the app will sign in anonymously.
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
+        // --- Firebase Instances ---
         let app;
         let db;
         let auth;
@@ -81,22 +66,17 @@
          */
         async function initializeFirebase() {
             try {
-                // Initialize Firebase app with the provided or placeholder config
+                // Initialize Firebase app with the provided configuration
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
 
                 document.getElementById('firebase-status').textContent = 'Authenticating...';
 
-                // Attempt to sign in with a custom token if available (from Canvas environment).
-                // Otherwise, sign in anonymously, which is suitable for public access.
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                    console.log('Signed in with custom token.');
-                } else {
-                    await signInAnonymously(auth);
-                    console.log('Signed in anonymously.');
-                }
+                // Sign in anonymously for public access.
+                // For production apps, consider more robust authentication methods.
+                await signInAnonymously(auth);
+                console.log('Signed in anonymously.');
 
                 // Listen for authentication state changes to update the UI with the user's ID.
                 onAuthStateChanged(auth, (user) => {
@@ -106,14 +86,14 @@
                         document.getElementById('firebase-status').textContent = 'Authenticated!';
                         document.getElementById('user-id').textContent = currentUserId;
                         console.log("Firebase initialized and user signed in:", currentUserId);
-                        // Make save button active once authenticated
+                        // Enable save button once authenticated
                         const saveBtn = document.getElementById('save-term-btn');
                         if (saveBtn) saveBtn.disabled = false;
 
                     } else {
-                        // If no user is logged in (e.g., anonymous, or not yet authenticated),
-                        // generate a random UUID as a temporary identifier.
-                        currentUserId = crypto.randomUUID();
+                        // This case should ideally not be hit after signInAnonymously,
+                        // but handles any potential sign-out or initial states.
+                        currentUserId = crypto.randomUUID(); // Fallback for unauthenticated scenarios
                         document.getElementById('firebase-status').textContent = 'Not Authenticated (Anonymous)';
                         document.getElementById('user-id').textContent = currentUserId;
                         console.log("No user signed in. Using random UUID for user ID:", currentUserId);
@@ -171,12 +151,17 @@
                     </div>
                 `;
                 // Load and execute admin-specific script
+                // Ensure 'js/admin.js' exists relative to this index.html
                 await import('./js/admin.js').then(module => {
+                    // Pass Firebase instances and app/user info to the admin module
                     module.initAdmin(db, auth, appId, currentUserId, serverTimestamp);
                 }).catch(error => {
                     console.error("Error loading admin.js:", error);
-                    document.getElementById('status-message').textContent = 'Error loading Admin features.';
-                    document.getElementById('status-message').classList.replace('text-yellow-400', 'text-red-500');
+                    const statusMsgEl = document.getElementById('status-message');
+                    if (statusMsgEl) {
+                        statusMsgEl.textContent = 'Error loading Admin features. Check console.';
+                        statusMsgEl.classList.replace('text-yellow-400', 'text-red-500');
+                    }
                 });
 
             } else if (mode === 'explorer') {
@@ -188,17 +173,19 @@
                 // TODO: Load and execute explorer-specific script here: import('./js/explorer.js');
             }
             // Ensure save button state is correct after content load
+            // This relies on auth.currentUser being updated, which happens asynchronously.
+            // The onAuthStateChanged listener will handle the final state.
             const saveBtn = document.getElementById('save-term-btn');
             if (saveBtn) {
                 saveBtn.disabled = !auth.currentUser;
             }
         }
 
-        // Event listeners for navigation buttons
+        // Event listeners for navigation buttons to switch between modes.
         document.getElementById('adminModeBtn').addEventListener('click', () => loadModuleContent('admin'));
         document.getElementById('explorerModeBtn').addEventListener('click', () => loadModuleContent('explorer'));
 
-        // Initialize Firebase when the window loads
+        // Initialize Firebase when the window loads to ensure all DOM elements are ready.
         window.onload = initializeFirebase;
 
         // Keyboard Shortcut for Admin Mode (Part of Phase 5 implementation).
