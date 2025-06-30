@@ -638,4 +638,3 @@ async function handleClearDatabase() {
         clearDatabaseBtn.disabled = false; // Re-enable button
     }
 }
- 
