@@ -146,7 +146,7 @@ function addDefinitionBlock() {
         <label class="block text-sm font-medium text-gray-300 mb-1">Definition ${definitionCounter}</label>
         <textarea required class="definition-text w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-cyan-500" rows="3" placeholder="Explain the term..."></textarea>
         <label class="block text-sm font-medium text-gray-300 mt-2 mb-1">Tags (comma-separated, e.g., color:red, type:process, origin:manual)</label>
-        <input type="text" class="definition-tags w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-cyan-500" placeholder="e.g., biology:core, color:green">
+        <input type="text" class="definition-tags w-full bg-gray-600 border भागा-500 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-cyan-500" placeholder="e.g., biology:core, color:green">
     `;
     definitionsContainer.appendChild(block);
 }
