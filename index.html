@@ -552,7 +552,15 @@
 
         // --- Global Firebase & App Variables ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-orbs-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const firebaseConfig = { // Directly declare firebaseConfig here
+          apiKey: "AIzaSyCYiaAH3wRzW6557xLJQ6zm9-RuSKBWWuM",
+          authDomain: "orbdefine.firebaseapp.com",
+          projectId: "orbdefine",
+          storageBucket: "orbdefine.firebasestorage.app",
+          messagingSenderId: "247935667317",
+          appId: "1:247935667317:web:2dff8b9b44848553fafc3c",
+          measurementId: "G-0VGTHSL2VZ"
+        };
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         let app;
@@ -596,21 +604,9 @@
         // --- Firebase Initialization and Auth ---
         window.onload = async () => {
             try {
-                // Modified to use a hardcoded default config if __firebase_config is not defined or empty
-                const actualFirebaseConfig = typeof __firebase_config !== 'undefined' && Object.keys(JSON.parse(__firebase_config)).length > 0
-                    ? JSON.parse(__firebase_config)
-                    : {
-                        apiKey: "AIzaSyCYiaAH3wRzW6557xLJQ6zm9-RuSKBWWuM",
-                        authDomain: "orbdefine.firebaseapp.com",
-                        projectId: "orbdefine",
-                        storageBucket: "orbdefine.firebasestorage.app",
-                        messagingSenderId: "247935667317",
-                        appId: "1:247935667317:web:2dff8b9b44848553fafc3c",
-                        measurementId: "G-0VGTHSL2VZ"
-                    };
-
-                if (Object.keys(actualFirebaseConfig).length > 0 && actualFirebaseConfig.projectId !== "YOUR_PROJECT_ID") { // Check to ensure it's not the generic placeholder
-                    app = initializeApp(actualFirebaseConfig);
+                // Direct use of firebaseConfig without checking __firebase_config
+                if (Object.keys(firebaseConfig).length > 0 && firebaseConfig.projectId) { // Simple check for non-empty and has projectId
+                    app = initializeApp(firebaseConfig);
                     db = getFirestore(app);
                     auth = getAuth(app);
 
@@ -626,7 +622,7 @@
                             currentUserId = user.uid;
                             console.log("Firebase initialized and user signed in:", currentUserId);
                             // Initialize modules after successful authentication
-                            initAdmin(db, auth, appId, currentUserId, serverTimestamp, Papa, showConfirmModal, collection, query, where, addDoc, getDocs, doc, updateDoc, deleteDoc);
+                            initAdmin(db, auth, appId, currentUserId, Papa, showConfirmModal, collection, query, where, addDoc, getDocs, doc, updateDoc, deleteDoc, serverTimestamp); // Corrected args order
                             // Pass db, appId, collection, query, getDocs to the inlined initExplorer
                             initExplorer(db, appId, collection, query, getDocs);
                         } else {
@@ -635,8 +631,8 @@
                         }
                     });
                 } else {
-                    console.error("Firebase config is missing or invalid. Please ensure __firebase_config is set or update the hardcoded fallback with your actual Firebase project details.");
-                    // Still initialize modules, but with null for Firebase instances, so UI can load
+                    console.error("Firebase config is invalid. Please check your firebaseConfig object.");
+                    // Still initialize modules with null for Firebase instances if config is bad
                     initAdmin(null, null, appId, 'anonymous', () => new Date(), Papa, showConfirmModal, null, null, null, null, null, null, null, null);
                     initExplorer(null, appId, null, null, null);
                 }
