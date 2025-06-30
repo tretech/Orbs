@@ -596,8 +596,21 @@
         // --- Firebase Initialization and Auth ---
         window.onload = async () => {
             try {
-                if (Object.keys(firebaseConfig).length > 0) {
-                    app = initializeApp(firebaseConfig);
+                // Modified to use a hardcoded default config if __firebase_config is not defined or empty
+                const actualFirebaseConfig = typeof __firebase_config !== 'undefined' && Object.keys(JSON.parse(__firebase_config)).length > 0
+                    ? JSON.parse(__firebase_config)
+                    : {
+                        apiKey: "AIzaSyCYiaAH3wRzW6557xLJQ6zm9-RuSKBWWuM",
+                        authDomain: "orbdefine.firebaseapp.com",
+                        projectId: "orbdefine",
+                        storageBucket: "orbdefine.firebasestorage.app",
+                        messagingSenderId: "247935667317",
+                        appId: "1:247935667317:web:2dff8b9b44848553fafc3c",
+                        measurementId: "G-0VGTHSL2VZ"
+                    };
+
+                if (Object.keys(actualFirebaseConfig).length > 0 && actualFirebaseConfig.projectId !== "YOUR_PROJECT_ID") { // Check to ensure it's not the generic placeholder
+                    app = initializeApp(actualFirebaseConfig);
                     db = getFirestore(app);
                     auth = getAuth(app);
 
@@ -622,10 +635,13 @@
                         }
                     });
                 } else {
-                    console.error("Firebase config is missing. Cannot initialize Firebase.");
+                    console.error("Firebase config is missing or invalid. Please ensure __firebase_config is set or update the hardcoded fallback with your actual Firebase project details.");
+                    // Still initialize modules, but with null for Firebase instances, so UI can load
+                    initAdmin(null, null, appId, 'anonymous', () => new Date(), Papa, showConfirmModal, null, null, null, null, null, null, null, null);
+                    initExplorer(null, appId, null, null, null);
                 }
             } catch (error) {
-                console.error("Error initializing Firebase or signing in:", error);
+                console.error("Error during Firebase initialization or sign-in:", error);
                 // Fallback for when Firebase isn't available (e.g., local dev without emulator)
                 initAdmin(null, null, appId, 'anonymous', () => new Date(), Papa, showConfirmModal, null, null, null, null, null, null, null, null);
                 initExplorer(null, appId, null, null, null);
@@ -657,19 +673,3 @@
     </script>
 </body>
 </html>
-```
-
-Thank you for providing the content of `https://tretech.github.io/Orbs/js/admin.js`. This confirms that your `admin.js` file is correct and up-to-date on GitHub. This is great news for the Admin section's functionality!
-
-However, the previous error `Uncaught SyntaxError: The requested module './js/explorer.js' does not provide an export named 'initExplorer'` still indicates an issue with `explorer.js`. Given your verification that you've replaced `explorer.js` and the commit button was greyed out, there's a strong chance the problem is still the **content of `explorer.js` on your GitHub Pages** not matching what it should, or a very persistent caching issue.
-
-**Let's try this specific check again, very carefully:**
-
-1.  **Open a new incognito/private browser window.** This ensures no caching from previous sessions.
-2.  In that incognito window, go directly to the URL of your `explorer.js` file:
-    `https://tretech.github.io/Orbs/js/explorer.js`
-3.  **Copy *all* the content you see on that page (from top to bottom) and paste it here in our chat.**
-
-This direct fetch will confirm, without any doubt, what exact code your browser is receiving for `explorer.js` from GitHub Pages. If it's still the `admin.js` code, then the previous commits/pushes for `explorer.js` didn't fully take effect, or there's a deployment delay on GitHub Pages.
-
-Once you provide that, I can definitively tell you the next step. If the content is *still* `admin.js` code, we might need to manually ensure `explorer.js` is correct on GitHub via the web interface or re-do the clone/commit/push steps for that specific fi
