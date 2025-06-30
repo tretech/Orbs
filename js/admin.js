@@ -146,7 +146,7 @@ function addDefinitionBlock() {
         <label class="block text-sm font-medium text-gray-300 mb-1">Definition ${definitionCounter}</label>
         <textarea required class="definition-text w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-cyan-500" rows="3" placeholder="Explain the term..."></textarea>
         <label class="block text-sm font-medium text-gray-300 mt-2 mb-1">Tags (comma-separated, e.g., color:red, type:process, origin:manual)</label>
-        <input type="text" class="definition-tags w-full bg-gray-600 border भागा-500 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-cyan-500" placeholder="e.g., biology:core, color:green">
+        <input type="text" class="definition-tags w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-cyan-500" placeholder="e.g., biology:core, color:green">
     `;
     definitionsContainer.appendChild(block);
 }
@@ -261,13 +261,21 @@ async function handleSaveTerm(event) {
         });
 
         const totalIndexDefs = definitionsToSave.length;
-        const totalIndexTags = definitionsToSave.reduce((acc, def) => acc + (def.tags ? def.tags.length : 0), 0); // Handle potential undefined tags
+        // CORRECTED: Calculate unique tags across all definitions for the term
+        const allUniqueTags = new Set();
+        definitionsToSave.forEach(def => {
+            if (def.tags) {
+                def.tags.forEach(tag => allUniqueTags.add(tag));
+            }
+        });
+        const totalIndexTags = allUniqueTags.size;
+
 
         const termDataToSave = {
             term: termName,
             note: note,
             indexDefs: totalIndexDefs,
-            indexTags: totalIndexTags,
+            indexTags: totalIndexTags, // Now correctly counts unique tags
             definitions: definitionsToSave,
             updatedAt: _serverTimestamp(), // Top-level term update timestamp
             // createdBy and createdAt are set only for truly new terms
@@ -534,13 +542,20 @@ async function processCsvFile(file, fileName, importStatusMessage, csvFileInputE
 
             // Calculate updated indices
             const newIndexDefs = definitionsForFirestore.length;
-            const newIndexTags = definitionsForFirestore.reduce((acc, def) => acc + (def.tags ? def.tags.length : 0), 0); // Handle potential undefined tags
+            // CORRECTED: Calculate unique tags across all definitions for the term
+            const allUniqueTagsForTerm = new Set();
+            definitionsForFirestore.forEach(def => {
+                if (def.tags) {
+                    def.tags.forEach(tag => allUniqueTagsForTerm.add(tag));
+                }
+            });
+            const newIndexTags = allUniqueTagsForTerm.size;
 
             const dataToSave = {
                 term: incomingTermData.term,
                 note: incomingTermData.note,
                 indexDefs: newIndexDefs,
-                indexTags: newIndexTags,
+                indexTags: newIndexTags, // Now correctly counts unique tags
                 definitions: definitionsForFirestore,
                 updatedAt: _serverTimestamp()
             };
