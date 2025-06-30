@@ -94,7 +94,7 @@ export function initExplorer(db, appId, collectionFn, queryFn, getDocsFn) {
     animate();
 
     // Initial message to user
-    commandInput.placeholder = "Type 'run:' to generate orbs, 'clear:' to remove, 'list:' to see terms.";
+    commandInput.placeholder = "Type 'run' to generate orbs, 'clear' to remove, 'list' to see terms."; // Updated placeholder
 }
 
 /**
@@ -198,7 +198,7 @@ async function renderOrbs() {
 
     if (termsData.length === 0) {
         const commandInput = document.getElementById('command-input');
-        commandInput.placeholder = "No terms found. Import some in Admin Mode first. Type 'run:' to try again.";
+        commandInput.placeholder = "No terms found. Import some in Admin Mode first. Type 'run' to try again."; // Updated placeholder
         return;
     }
 
@@ -280,30 +280,25 @@ async function renderOrbs() {
  */
 async function handleCommand(fullCommandInput) {
     const commandInput = document.getElementById('command-input');
-    let commandPrefix = '';
-    let actualCommand = '';
+    let commandToExecute = fullCommandInput.trim().toLowerCase(); // Assume entire input is command by default
 
-    // Split the command by the first colon to differentiate prefix from command
-    const parts = fullCommandInput.split(':');
-    if (parts.length > 1) {
-        commandPrefix = parts[0].trim().toLowerCase();
-        actualCommand = parts.slice(1).join(':').trim().toLowerCase(); // Rejoin if command itself has colons
-    } else {
-        // If no colon, treat the whole input as the command
-        actualCommand = fullCommandInput.toLowerCase();
+    // If a colon exists, treat the part before the colon as the main command
+    const colonIndex = commandToExecute.indexOf(':');
+    if (colonIndex !== -1) {
+        commandToExecute = commandToExecute.substring(0, colonIndex).trim();
     }
 
-    console.log(`Executing command: '${commandPrefix}' with value: '${actualCommand}'`);
+    console.log(`Executing command: '${commandToExecute}'`);
 
-    switch (commandPrefix) {
+    switch (commandToExecute) {
         case 'run':
             commandInput.placeholder = "Loading orbs...";
             termsData = await fetchTerms(); // Re-fetch in case new terms were added
             if (termsData.length > 0) {
                 renderOrbs();
-                commandInput.placeholder = `Orbs active! Displaying ${termsData.length} terms. Type 'clear:' to reset or 'run:' again.`;
+                commandInput.placeholder = `Orbs active! Displaying ${termsData.length} terms. Type 'clear' to reset or 'run' again.`; // Updated placeholder
             } else {
-                commandInput.placeholder = "No terms found. Import some in Admin Mode first. Type 'run:' to try again.";
+                commandInput.placeholder = "No terms found. Import some in Admin Mode first. Type 'run' to try again."; // Updated placeholder
             }
             break;
         case 'clear':
@@ -315,15 +310,15 @@ async function handleCommand(fullCommandInput) {
                 if (child.material) child.material.dispose();
                 if (child.map) child.map.dispose();
             }
-            commandInput.placeholder = "Orbs cleared. Type 'run:' to restart.";
+            commandInput.placeholder = "Orbs cleared. Type 'run' to restart."; // Updated placeholder
             console.log("Orbs cleared successfully.");
             break;
         case 'list': // For debugging
             console.log("Current Terms:", termsData);
-            commandInput.placeholder = "Terms listed in console. Type 'run:' to restart.";
+            commandInput.placeholder = "Terms listed in console. Type 'run' to restart."; // Updated placeholder
             break;
         default:
-            commandInput.placeholder = `Unknown command or format. Try 'run:', 'clear:', or 'list:'.`;
+            commandInput.placeholder = `Unknown command: '${commandToExecute}'. Try 'run', 'clear', or 'list'.`; // Updated placeholder
             break;
     }
 }
