@@ -22,13 +22,12 @@ let _deleteDoc;
 let definitionCounter = 0; // Tracks the number of definition blocks in the form
 let termsCollectionRef; // Reference to the Firestore terms collection
 
-// Define expected and alternative column headers for rehash logic
-// These are now indicators rather than direct mappings for flexible parsing.
+// Define expected and alternative column headers as indicators for flexible parsing.
 const COLUMN_MAPPINGS = {
     'term_indicators': ['term', 'concept', 'word', 'name'],
-    'note_indicators': ['note', 'description', 'summary'],
+    'note_indicators': ['note', 'description', 'summary', 'notes'], // Added 'notes'
     'definition_indicators': ['definition', 'meaning', 'def', 'deff', 'explanation'], // Matches 'def' from user's CSV
-    'tag_indicators': ['tags', 'keywords', 'categories', 'tag'] // Matches 'tag' from user's CSV
+    'tag_indicators': ['tags', 'keywords', 'categories', 'tag', 'tabs'] // Added 'tabs'
 };
 
 /**
@@ -281,7 +280,7 @@ async function handleSaveTerm(event) {
             statusMessage.textContent = `Term "${termName}" updated successfully! Added ${definitionsAddedCount} new definitions, updated ${definitionsUpdatedCount} definitions.`;
         } else {
             // Add new term
-            await _addDoc(termsCollectionRef, termDataToSave);
+            await _addDoc(termsCollectionRef, dataToSave);
             statusMessage.textContent = `Term "${termName}" added successfully!`;
         }
 
@@ -308,13 +307,14 @@ async function handleSaveTerm(event) {
 }
 
 /**
- * Attempts to rehash a row from CSV data based on predefined column mappings.
- * It tries to find the best match for 'term', 'note', 'definition', and 'tags'.
- * @param {object} row - The raw row object parsed by PapaParse.
- * @param {Array<string>} headers - The original headers from the CSV.
- * @returns {object|null} - A rehashed row object with standard keys, or null if essential data is missing.
+ * Attempts to intelligently map a raw CSV row (array of values) to a rehashed object
+ * based on identified headers and COLUMN_MAPPINGS.
+ * @param {Array<string>} rowValues - An array of values from a single CSV row.
+ * @param {Array<string>} headers - The array of header names from the first row of the CSV.
+ * @returns {object|null} - A rehashed row object with standard keys (term, note, definitionTexts, allTags),
+ * or null if essential data (term or definition) is missing.
  */
-function rehashCsvRow(row, headers) {
+function rehashCsvRow(rowValues, headers) {
     const rehashedRow = {
         term: '',
         note: '',
@@ -324,9 +324,9 @@ function rehashCsvRow(row, headers) {
     let termFound = false;
     let definitionFound = false; // To ensure at least one definition is found
 
-    headers.forEach(header => {
-        const lowerHeader = header.toLowerCase();
-        const value = String(row[header] || '').trim();
+    headers.forEach((header, index) => {
+        const lowerHeader = String(header || '').toLowerCase();
+        const value = String(rowValues[index] || '').trim();
 
         // Check for Term
         if (!termFound && COLUMN_MAPPINGS.term_indicators.some(indicator => lowerHeader === indicator)) {
@@ -338,6 +338,7 @@ function rehashCsvRow(row, headers) {
             rehashedRow.note = value;
         }
         // Check for Definitions
+        // Use .includes to match 'def' within 'def1', 'def2' etc.
         else if (COLUMN_MAPPINGS.definition_indicators.some(indicator => lowerHeader.includes(indicator))) {
             if (value !== '') {
                 rehashedRow.definitionTexts.push(value);
@@ -345,6 +346,7 @@ function rehashCsvRow(row, headers) {
             }
         }
         // Check for Tags
+        // Use .includes to match 'tag' within 'tag1', 'tag2' etc.
         else if (COLUMN_MAPPINGS.tag_indicators.some(indicator => lowerHeader.includes(indicator))) {
             if (value !== '') {
                 value.split(',').forEach(tag => {
@@ -375,22 +377,23 @@ function rehashCsvRow(row, headers) {
  * @param {File} file - The CSV file to import.
  * @param {string} fileName - The name of the imported file.
  * @param {HTMLElement} importStatusMessage - The element to display import status.
+ * @param {HTMLInputElement} csvFileInputElement - The file input element to clear after import.
  */
-async function processCsvFile(file, fileName, importStatusMessage) {
+async function processCsvFile(file, fileName, importStatusMessage, csvFileInputElement) {
     importStatusMessage.textContent = `Importing "${fileName}"... (Parsing)`;
     importStatusMessage.classList.remove('text-red-500', 'text-green-500');
     importStatusMessage.classList.add('text-yellow-400');
 
-    let parsedData;
+    let rawParsedData; // Renamed to clarify it's the raw array-of-arrays from PapaParse
     try {
         console.log(`Attempting to parse CSV file: ${fileName}`);
-        parsedData = await new Promise((resolve, reject) => {
+        rawParsedData = await new Promise((resolve, reject) => {
             _Papa.parse(file, {
-                header: true, // Treat first row as headers
+                header: false, // CRITICAL CHANGE: Parse as array of arrays, not objects
                 skipEmptyLines: true,
                 dynamicTyping: true, // Attempt to convert numbers/booleans
                 complete: function(results) {
-                    console.log("PapaParse complete results:", results);
+                    console.log("PapaParse complete results (header: false):", results);
                     if (results.errors.length) {
                         reject(new Error(`CSV parsing errors: ${results.errors.map(e => e.message).join('; ')}`));
                     } else {
@@ -404,27 +407,27 @@ async function processCsvFile(file, fileName, importStatusMessage) {
             });
         });
 
-        console.log("Raw Parsed Data:", parsedData);
+        console.log("Raw Parsed Data (array of arrays):", rawParsedData);
 
-        if (!parsedData || parsedData.length === 0) {
-            importStatusMessage.textContent = 'CSV file is empty or could not be parsed into meaningful data.';
+        if (!rawParsedData || rawParsedData.length < 2) { // Need at least 2 rows: headers + 1 data row
+            importStatusMessage.textContent = 'CSV file is empty or missing headers/data.';
             importStatusMessage.classList.replace('text-yellow-400', 'text-red-500');
             return;
         }
 
-        // Get actual headers from parsed data (PapaParse provides them in the first object's keys)
-        const actualHeaders = parsedData.length > 0 ? Object.keys(parsedData[0]) : [];
-        console.log("Actual CSV Headers:", actualHeaders);
+        const actualHeaders = rawParsedData[0]; // First row is headers
+        const dataRows = rawParsedData.slice(1); // Rest are data rows
+        console.log("Actual CSV Headers (from first row):", actualHeaders);
 
         const rehashedAndValidatedData = [];
         let rowsSkippedDueToRehash = 0;
-        parsedData.forEach((row, index) => {
-            const rehashedRow = rehashCsvRow(row, actualHeaders);
+        dataRows.forEach((rowValues, index) => { // Iterate over array of values for each row
+            const rehashedRow = rehashCsvRow(rowValues, actualHeaders);
             if (rehashedRow) {
                 rehashedAndValidatedData.push(rehashedRow);
             } else {
                 rowsSkippedDueToRehash++;
-                console.warn(`Skipped row ${index + 1} due to insufficient data or unmappable columns after rehash:`, row);
+                console.warn(`Skipped row ${index + 2} (original CSV row number) due to insufficient data or unmappable columns after rehash:`, rowValues);
             }
         });
 
@@ -560,7 +563,10 @@ async function processCsvFile(file, fileName, importStatusMessage) {
         importStatusMessage.textContent = `Import complete: ${termsAdded} terms added, ${termsUpdated} terms updated. ${definitionsAdded} new definitions added, ${definitionsUpdated} existing definitions updated, ${definitionsSkipped} definitions skipped. ${rowsSkippedDueToRehash} rows skipped due to rehash issues.`;
         importStatusMessage.classList.replace('text-yellow-400', 'text-green-500');
         displayTermsMatrix(); // Refresh the matrix
-        csvFileInput.value = ''; // Clear file input
+        // Clear the file input element's value
+        if (csvFileInputElement) {
+            csvFileInputElement.value = '';
+        }
 
     } catch (error) {
         console.error("Error importing CSV:", error);
@@ -582,7 +588,8 @@ async function handleImportCsv() {
         return;
     }
     const file = csvFileInput.files[0];
-    await processCsvFile(file, file.name, importStatusMessage);
+    // Pass the csvFileInput element to processCsvFile so it can clear its value
+    await processCsvFile(file, file.name, importStatusMessage, csvFileInput);
 }
 
 
@@ -604,7 +611,7 @@ async function handleClearDatabase() {
         clearDatabaseBtn.disabled = false; // Re-enable button
         importStatusMessage.textContent = 'Database clear cancelled.';
         importStatusMessage.classList.remove('text-red-500', 'text-green-500');
-        importStatusMessage.classList.add('text-yellow-400');
+    importStatusMessage.classList.add('text-yellow-400');
         return;
     }
 
@@ -632,7 +639,7 @@ async function handleClearDatabase() {
 
     } catch (error) {
         console.error("Error clearing database:", error);
-        importStatusMessage.textContent = `Error clearing database: ${error.message}`;
+        importStatusMessage.textContent = `Error importing CSV: ${error.message}`;
         importStatusMessage.classList.replace('text-yellow-400', 'text-red-500');
     } finally {
         clearDatabaseBtn.disabled = false; // Re-enable button
