@@ -1,322 +1,329 @@
 // js/explorer.js
-// This file contains all logic specific to the Explorer Mode, including 3D orb visualization.
-
-import { collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// This file contains all logic specific to the Explorer Mode.
 
 let _db;
-let _auth;
 let _appId;
-let _currentUserId;
-let _THREE;
+let _collection;
+let _query;
+let _getDocs;
 
 // Three.js variables
-let scene, camera, renderer, orbContainer;
-const orbs = []; // Array to hold Three.js mesh objects for orbs
-const orbData = []; // Array to hold the fetched term data for orbs
+let scene, camera, renderer;
+let orbGroup; // Group to hold all orbs
+let termsData = []; // Array to store fetched terms
+const ORB_RADIUS = 0.5; // Radius for the sphere representing an orb
+const FONT_SIZE = 0.3; // Approximate font size for term labels
 
-// Mouse control variables
+// Mouse interaction variables
 let isDragging = false;
-let previousMousePosition = { x: 0, y: 0 };
+let previousMouseX = 0;
+let previousMouseY = 0;
 
 /**
- * Initializes the Explorer module with Firebase, user details, and Three.js.
+ * Initializes the Explorer module with Firebase instances and relevant functions.
  * @param {object} db - Firestore database instance.
- * @param {object} auth - Firebase Auth instance.
  * @param {string} appId - The application ID.
- * @param {string} currentUserId - The current authenticated user's ID.
- * @param {object} THREE_LIB - The Three.js library object.
+ * @param {function} collectionFn - The Firestore 'collection' function.
+ * @param {function} queryFn - The Firestore 'query' function.
+ * @param {function} getDocsFn - The Firestore 'getDocs' function.
  */
-export function initExplorer(db, auth, appId, currentUserId, THREE_LIB) {
+export function initExplorer(db, appId, collectionFn, queryFn, getDocsFn) {
     _db = db;
-    _auth = auth;
     _appId = appId;
-    _currentUserId = currentUserId;
-    _THREE = THREE_LIB;
-
-    orbContainer = document.getElementById('orb-container');
-    if (!orbContainer) {
-        console.error("Orb container not found!");
-        return;
-    }
-    orbContainer.innerHTML = ''; // Clear "Loading orbs..." message
+    _collection = collectionFn;
+    _query = queryFn;
+    _getDocs = getDocsFn;
 
     console.log("Explorer module initialized. App ID:", _appId);
 
-    setupThreeJs();
-    addEventListeners();
-    fetchAndDisplayOrbs();
-    animate(); // Start the animation loop
+    // Get the orb display area and command input
+    const orbDisplayArea = document.getElementById('orb-display-area');
+    const commandInput = document.getElementById('command-input');
+
+    if (!orbDisplayArea || !commandInput) {
+        console.error("Explorer UI elements not found. Cannot initialize Explorer Mode.");
+        return;
+    }
+
+    // Initialize Three.js scene
+    initThreeJS(orbDisplayArea);
+
+    // Event listener for command input
+    commandInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+            const fullCommand = commandInput.value.trim();
+            console.log("Command entered:", fullCommand);
+            handleCommand(fullCommand);
+            commandInput.value = ''; // Clear input after command
+        }
+    });
+
+    // Mouse interaction for camera control
+    orbDisplayArea.addEventListener('mousedown', (event) => {
+        isDragging = true;
+        previousMouseX = event.clientX;
+        previousMouseY = event.clientY;
+    });
+
+    orbDisplayArea.addEventListener('mouseup', () => {
+        isDragging = false;
+    });
+
+    orbDisplayArea.addEventListener('mousemove', (event) => {
+        if (!isDragging) return;
+
+        const deltaX = event.clientX - previousMouseX;
+        const deltaY = event.clientY - previousMouseY;
+
+        // Rotate the orbGroup based on mouse movement
+        // Increase sensitivity for smoother rotation
+        orbGroup.rotation.y += deltaX * 0.005;
+        orbGroup.rotation.x += deltaY * 0.005;
+
+        // Clamp rotation to prevent flipping
+        orbGroup.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, orbGroup.rotation.x));
+
+        previousMouseX = event.clientX;
+        previousMouseY = event.clientY;
+    });
+
+    // Handle window resize
+    window.addEventListener('resize', onWindowResize);
+
+    // Start the animation loop
+    animate();
+
+    // Initial message to user
+    commandInput.placeholder = "Type 'run:' to generate orbs, 'clear:' to remove, 'list:' to see terms.";
 }
 
 /**
- * Sets up the Three.js scene, camera, and renderer.
+ * Initializes the Three.js scene, camera, and renderer.
+ * @param {HTMLElement} container - The DOM element to append the canvas to.
  */
-function setupThreeJs() {
+function initThreeJS(container) {
     // Scene
-    scene = new _THREE.Scene();
-    scene.background = new _THREE.Color(0x1a202c); // Match body background
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a202c); // Match body background
 
     // Camera
-    camera = new _THREE.PerspectiveCamera(75, orbContainer.clientWidth / orbContainer.clientHeight, 0.1, 1000);
-    camera.position.z = 5;
+    camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+    camera.position.z = 5; // Position camera back
 
     // Renderer
-    renderer = new _THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(orbContainer.clientWidth, orbContainer.clientHeight);
-    orbContainer.appendChild(renderer.domElement);
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    container.appendChild(renderer.domElement); // Append canvas to the container
 
-    // Add a simple ambient light
-    const ambientLight = new _THREE.AmbientLight(0x404040); // soft white light
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0x404040); // Soft white light
     scene.add(ambientLight);
-
-    // Add a directional light
-    const directionalLight = new _THREE.DirectionalLight(0xffffff, 0.5);
-    directionalLight.position.set(1, 1, 1).normalize();
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7); // Brighter directional light
+    directionalLight.position.set(0, 1, 1).normalize();
     scene.add(directionalLight);
 
-    // Handle window resizing
-    window.addEventListener('resize', onWindowResize, false);
+    // Orb group for easy rotation/manipulation of all orbs
+    orbGroup = new THREE.Group();
+    scene.add(orbGroup);
 }
 
 /**
- * Handles window resizing to adjust Three.js renderer and camera.
+ * Handles window resize events to update camera aspect and renderer size.
  */
 function onWindowResize() {
-    if (orbContainer && renderer && camera) {
-        camera.aspect = orbContainer.clientWidth / orbContainer.clientHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(orbContainer.clientWidth, orbContainer.clientHeight);
-    }
+    const orbDisplayArea = document.getElementById('orb-display-area');
+    if (!orbDisplayArea || !camera || !renderer) return;
+
+    camera.aspect = orbDisplayArea.clientWidth / orbDisplayArea.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(orbDisplayArea.clientWidth, orbDisplayArea.clientHeight);
 }
 
 /**
- * Adds event listeners for mouse interaction and the command line input.
- */
-function addEventListeners() {
-    // Mouse control for camera movement
-    renderer.domElement.addEventListener('mousedown', onMouseDown, false);
-    renderer.domElement.addEventListener('mouseup', onMouseUp, false);
-    renderer.domElement.addEventListener('mousemove', onMouseMove, false);
-
-    // Command line input for "run:" commands
-    const commandLineInput = document.getElementById('command-line-input');
-    if (commandLineInput) {
-        commandLineInput.addEventListener('keypress', onCommandLineKeyPress);
-    }
-}
-
-/**
- * Handles mouse down event for camera rotation.
- * @param {MouseEvent} event - The mouse event.
- */
-function onMouseDown(event) {
-    isDragging = true;
-    previousMousePosition = {
-        x: event.clientX,
-        y: event.clientY
-    };
-}
-
-/**
- * Handles mouse up event.
- */
-function onMouseUp() {
-    isDragging = false;
-}
-
-/**
- * Handles mouse move event for camera rotation.
- * @param {MouseEvent} event - The mouse event.
- */
-function onMouseMove(event) {
-    if (!isDragging) return;
-
-    const deltaMove = {
-        x: event.clientX - previousMousePosition.x,
-        y: event.clientY - previousMousePosition.y
-    };
-
-    // Sensitivity of rotation
-    const rotationSpeed = 0.005;
-
-    // Rotate around Y-axis for horizontal mouse movement
-    scene.rotation.y += deltaMove.x * rotationSpeed;
-
-    // Rotate around X-axis for vertical mouse movement (limit to avoid flipping)
-    scene.rotation.x += deltaMove.y * rotationSpeed;
-    scene.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, scene.rotation.x)); // Limit vertical rotation
-
-    previousMousePosition = {
-        x: event.clientX,
-        y: event.clientY
-    };
-}
-
-/**
- * Handles key presses on the command line input.
- * @param {KeyboardEvent} event - The keyboard event.
- */
-function onCommandLineKeyPress(event) {
-    if (event.key === 'Enter') {
-        const input = event.target.value.trim();
-        console.log("Command entered:", input);
-        event.target.value = ''; // Clear input
-
-        if (input.startsWith('run:')) {
-            const command = input.substring(4).trim();
-            executeCommand(command);
-        } else {
-            console.warn("Invalid command format. Use 'run: [command]'");
-        }
-    }
-}
-
-/**
- * Executes a command from the command line.
- * @param {string} command - The command string.
- */
-function executeCommand(command) {
-    // This is where you'll implement command logic (e.g., filtering orbs)
-    console.log("Executing command:", command);
-    // Example: if (command === 'show all') { showAllOrbs(); }
-    // More complex commands will involve parsing and acting on orb properties
-}
-
-
-/**
- * Fetches terms from Firestore and creates 3D orbs based on their properties.
- */
-async function fetchAndDisplayOrbs() {
-    // Clear existing orbs from scene and arrays
-    orbs.forEach(orb => scene.remove(orb));
-    orbs.length = 0;
-    orbData.length = 0;
-
-    try {
-        const termsCollectionRef = collection(_db, `artifacts/${_appId}/public/data/terms`);
-        const snapshot = await getDocs(termsCollectionRef);
-
-        if (snapshot.empty) {
-            console.log("No terms found in the database for orb generation.");
-            orbContainer.innerHTML = '<p class="text-gray-400">No terms to display. Add some in Admin Mode!</p>';
-            return;
-        }
-
-        const orbPositions = [];
-        const maxAttempts = 1000; // Limit attempts to find non-overlapping positions
-        const minDistance = 1; // Minimum distance between orb centers
-
-        snapshot.forEach(doc => {
-            const term = doc.data();
-            orbData.push(term);
-
-            // Determine orb properties from tags
-            let color = 0x0077ff; // Default blue
-            let radius = 0.5; // Default size
-            let speed = 0.01; // Default speed
-            let motionType = 'random'; // Default motion
-
-            if (term.definitions && term.definitions.length > 0) {
-                term.definitions.forEach(def => {
-                    def.tags.forEach(tag => {
-                        const [key, value] = tag.split(':');
-                        if (key === 'color') {
-                            // Convert color name or hex string to Three.js color
-                            color = new _THREE.Color(value);
-                        } else if (key === 'size') {
-                            if (value === 'small') radius = 0.3;
-                            else if (value === 'medium') radius = 0.6;
-                            else if (value === 'large') radius = 0.9;
-                            else radius = parseFloat(value) || 0.5;
-                        } else if (key === 'speed') {
-                            if (value === 'slow') speed = 0.005;
-                            else if (value === 'medium') speed = 0.01;
-                            else if (value === 'fast') speed = 0.02;
-                            else speed = parseFloat(value) || 0.01;
-                        } else if (key === 'motion') {
-                            motionType = value; // e.g., 'repulse', 'attract'
-                        }
-                    });
-                });
-            }
-
-            // Find a non-overlapping position for the orb
-            let positionFound = false;
-            let pos;
-            for (let i = 0; i < maxAttempts; i++) {
-                // Generate a random position within a sphere
-                const x = (Math.random() - 0.5) * 10;
-                const y = (Math.random() - 0.5) * 10;
-                const z = (Math.random() - 0.5) * 10;
-                pos = new _THREE.Vector3(x, y, z);
-
-                let overlap = false;
-                for (const existingPos of orbPositions) {
-                    if (existingPos.distanceTo(pos) < (radius * 2 + minDistance)) { // Check for overlap
-                        overlap = true;
-                        break;
-                    }
-                }
-                if (!overlap) {
-                    positionFound = true;
-                    orbPositions.push(pos);
-                    break;
-                }
-            }
-
-            if (!positionFound) {
-                console.warn("Could not find non-overlapping position for an orb. Placing it anyway.");
-                // Fallback: just place it, might overlap
-                const x = (Math.random() - 0.5) * 10;
-                const y = (Math.random() - 0.5) * 10;
-                const z = (Math.random() - 0.5) * 10;
-                pos = new _THREE.Vector3(x, y, z);
-                orbPositions.push(pos);
-            }
-
-            // Create Orb Mesh
-            const geometry = new _THREE.SphereGeometry(radius, 32, 32);
-            const material = new _THREE.MeshPhongMaterial({ color: color, flatShading: true }); // PhongMaterial for lighting effects
-            const mesh = new _THREE.Mesh(geometry, material);
-            mesh.position.copy(pos);
-
-            // Store orb properties on the mesh for animation
-            mesh.userData.termData = term;
-            mesh.userData.speed = speed;
-            mesh.userData.motionType = motionType;
-
-            scene.add(mesh);
-            orbs.push(mesh);
-        });
-
-        if (orbs.length > 0) {
-            orbContainer.innerHTML = ''; // Clear "No terms" message if orbs are generated
-        }
-
-
-    } catch (error) {
-        console.error("Error fetching or creating orbs:", error);
-        orbContainer.innerHTML = '<p class="text-red-400">Error displaying orbs. Check console.</p>';
-    }
-}
-
-
-/**
- * Animation loop for the orbs.
+ * The main animation loop for Three.js.
  */
 function animate() {
     requestAnimationFrame(animate);
 
-    orbs.forEach(orb => {
-        // Simple rotation for all orbs
-        orb.rotation.x += 0.01;
-        orb.rotation.y += 0.01;
-
-        // Basic movement based on speed
-        // This can be expanded to more complex tag-driven motion
-        orb.position.x += Math.sin(Date.now() * 0.0001 * orb.userData.speed) * 0.01;
-        orb.position.y += Math.cos(Date.now() * 0.0001 * orb.userData.speed) * 0.01;
-    });
+    // Rotate the orb group slowly
+    if (orbGroup) {
+        // orbGroup.rotation.y += 0.001; // Continuous slow rotation (optional)
+    }
 
     renderer.render(scene, camera);
+}
+
+/**
+ * Fetches terms from Firestore and updates the termsData array.
+ * @returns {Promise<Array>} - A promise that resolves with the fetched terms.
+ */
+async function fetchTerms() {
+    if (!_db || !_collection || !_getDocs) {
+        console.warn("Firestore not initialized for Explorer. Cannot fetch terms.");
+        return [];
+    }
+    console.log("Fetching terms from Firestore...");
+    try {
+        const termsCollectionRef = _collection(_db, `artifacts/${_appId}/public/data/terms`);
+        const snapshot = await _getDocs(termsCollectionRef);
+        const fetchedTerms = [];
+        snapshot.forEach(doc => {
+            fetchedTerms.push({ id: doc.id, ...doc.data() });
+        });
+        termsData = fetchedTerms; // Update global termsData
+        console.log("Fetched terms:", termsData.length, "terms.");
+        return termsData;
+    } catch (error) {
+        console.error("Error fetching terms:", error);
+        return [];
+    }
+}
+
+/**
+ * Renders the terms as interactive orbs in the 3D scene.
+ */
+async function renderOrbs() {
+    // Clear existing orbs from the group
+    console.log("Clearing existing orbs...");
+    while (orbGroup.children.length > 0) {
+        const child = orbGroup.children[0];
+        orbGroup.remove(child);
+        // Dispose of geometry, material, texture to free up memory
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) child.material.dispose();
+        if (child.map) child.map.dispose(); // For textures on sprites
+    }
+    console.log("Existing orbs cleared.");
+
+
+    if (termsData.length === 0) {
+        const commandInput = document.getElementById('command-input');
+        commandInput.placeholder = "No terms found. Import some in Admin Mode first. Type 'run:' to try again.";
+        return;
+    }
+
+    const geometry = new THREE.SphereGeometry(ORB_RADIUS, 32, 32);
+
+    // Position orbs in a sphere or grid for visibility
+    const numOrbs = termsData.length;
+    const phi = Math.PI * (3 - Math.sqrt(5)); // Golden angle approximation for even distribution
+    console.log(`Rendering ${numOrbs} orbs...`);
+    for (let i = 0; i < numOrbs; i++) {
+        const y = 1 - (i / (numOrbs - 1)) * 2; // y goes from 1 to -1
+        const radius = Math.sqrt(1 - y * y); // Radius at y
+
+        const theta = phi * i;
+
+        const x = radius * Math.cos(theta);
+        const z = radius * Math.sin(theta);
+
+        // Adjust overall spread - dynamically based on number of orbs
+        // Ensure minimum spread for small number of orbs
+        const spreadFactor = Math.max(2, numOrbs * 0.15);
+        const position = new THREE.Vector3(x * spreadFactor, y * spreadFactor, z * spreadFactor);
+
+        // Create orb mesh
+        const material = new THREE.MeshPhongMaterial({
+            color: new THREE.Color(Math.random() * 0xffffff), // Random color for each orb
+            transparent: true,
+            opacity: 0.8,
+            shininess: 50
+        });
+        const orbMesh = new THREE.Mesh(geometry, material);
+        orbMesh.position.copy(position);
+        orbMesh.userData = { term: termsData[i].term, id: termsData[i].id }; // Store term data
+
+        orbGroup.add(orbMesh);
+
+        // Add 2D text label using CanvasTexture for simplicity
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        const text = termsData[i].term;
+
+        // Dynamically size canvas based on text
+        context.font = `Bold ${Math.round(FONT_SIZE * 50)}px Inter`; // Set font to measure text
+        const textMetrics = context.measureText(text);
+        const textWidth = textMetrics.width;
+        const textHeight = Math.round(FONT_SIZE * 50 * 1.2); // Estimate height based on font size + line height
+
+        canvas.width = textWidth + 20; // Add padding
+        canvas.height = textHeight + 10; // Add padding
+
+        // Clear canvas and redraw text after resizing
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.font = `Bold ${Math.round(FONT_SIZE * 50)}px Inter`;
+        context.fillStyle = 'white';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(text, canvas.width / 2, canvas.height / 2);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+        const sprite = new THREE.Sprite(spriteMaterial);
+        // Adjust sprite scale based on canvas dimensions and desired world size
+        const aspectRatio = canvas.width / canvas.height;
+        sprite.scale.set(FONT_SIZE * 2 * aspectRatio, FONT_SIZE * 2, 1); // Scale to fit desired world size
+
+        // Position text slightly above the orb
+        sprite.position.copy(position);
+        sprite.position.y += ORB_RADIUS + (FONT_SIZE * 0.5); // Position above orb, adjust offset
+        sprite.position.z += 0.01; // Slight offset to prevent z-fighting with orb
+
+        orbGroup.add(sprite);
+    }
+    console.log("Orbs rendered successfully.");
+}
+
+/**
+ * Handles commands entered into the input field.
+ * @param {string} fullCommandInput - The full command string from the input field.
+ */
+async function handleCommand(fullCommandInput) {
+    const commandInput = document.getElementById('command-input');
+    let commandPrefix = '';
+    let actualCommand = '';
+
+    // Split the command by the first colon to differentiate prefix from command
+    const parts = fullCommandInput.split(':');
+    if (parts.length > 1) {
+        commandPrefix = parts[0].trim().toLowerCase();
+        actualCommand = parts.slice(1).join(':').trim().toLowerCase(); // Rejoin if command itself has colons
+    } else {
+        // If no colon, treat the whole input as the command
+        actualCommand = fullCommandInput.toLowerCase();
+    }
+
+    console.log(`Executing command: '${commandPrefix}' with value: '${actualCommand}'`);
+
+    switch (commandPrefix) {
+        case 'run':
+            commandInput.placeholder = "Loading orbs...";
+            termsData = await fetchTerms(); // Re-fetch in case new terms were added
+            if (termsData.length > 0) {
+                renderOrbs();
+                commandInput.placeholder = `Orbs active! Displaying ${termsData.length} terms. Type 'clear:' to reset or 'run:' again.`;
+            } else {
+                commandInput.placeholder = "No terms found. Import some in Admin Mode first. Type 'run:' to try again.";
+            }
+            break;
+        case 'clear':
+            while (orbGroup.children.length > 0) {
+                const child = orbGroup.children[0];
+                orbGroup.remove(child);
+                // Dispose of geometry, material, texture to free up memory
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+                if (child.map) child.map.dispose();
+            }
+            commandInput.placeholder = "Orbs cleared. Type 'run:' to restart.";
+            console.log("Orbs cleared successfully.");
+            break;
+        case 'list': // For debugging
+            console.log("Current Terms:", termsData);
+            commandInput.placeholder = "Terms listed in console. Type 'run:' to restart.";
+            break;
+        default:
+            commandInput.placeholder = `Unknown command or format. Try 'run:', 'clear:', or 'list:'.`;
+            break;
+    }
 }
