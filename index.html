@@ -1,324 +1,662 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Orbs System</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
-    <!-- PapaParse for CSV parsing -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
-    <!-- Three.js for 3D visualization -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #1a202c; /* Dark background */
-            color: #e2e8f0; /* Light gray text */
-        }
-        .tab-button.active {
-            @apply bg-cyan-700 text-white;
-        }
-        /* Custom styles for confirmation modal */
-        .modal-overlay {
-            background-color: rgba(0, 0, 0, 0.7);
-        }
-        .modal-content {
-            background-color: #2d3748;
-        }
-        /* Ensure the matrix container has a fixed height and allows scrolling */
-        .terms-matrix-container {
-            max-height: 400px; /* Adjust as needed */
-            overflow-y: auto;
-            border: 1px solid #4a5568; /* Border for visual clarity */
-            border-radius: 0.5rem;
-        }
-        /* Styling for the table inside the matrix viewer */
-        .terms-matrix-container table {
-            width: 100%; /* Make table fill container */
-            border-collapse: collapse; /* Remove double borders */
-        }
-        .terms-matrix-container th,
-        .terms-matrix-container td {
-            padding: 0.75rem; /* Padding for cells */
-            text-align: left; /* Align text */
-        }
-        .terms-matrix-container thead th {
-            background-color: #2d3748; /* Darker header background */
-            color: #cbd5e0; /* Lighter header text */
-            position: sticky;
-            top: 0;
-            z-index: 10; /* Ensure header stays on top when scrolling */
-        }
-        /* Orb display area to take full height and width */
-        #orb-display-area {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            overflow: hidden; /* Hide overflow from orbs */
-        }
-        #command-input-container {
-            position: absolute;
-            bottom: 1rem;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 80%; /* Adjust width as needed */
-            max-width: 600px; /* Max width for larger screens */
-            z-index: 20; /* Ensure it's above canvas */
-            background-color: #2d3748; /* Dark background for input */
-            border-radius: 0.5rem;
-            padding: 0.75rem 1rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
+// js/admin.js
+// This file contains all logic specific to the Admin Panel.
 
-    </style>
-</head>
-<body class="flex flex-col min-h-screen">
-    <!-- Main content area -->
-    <div class="flex-grow flex">
-        <!-- Sidebar for navigation/tabs -->
-        <aside class="w-64 bg-gray-800 p-6 flex flex-col shadow-lg">
-            <h1 class="text-3xl font-bold text-white mb-6">Orbs System</h1>
-            <nav class="flex flex-col space-y-4">
-                <button id="explorer-tab" class="tab-button bg-gray-700 hover:bg-gray-600 text-white py-3 px-4 rounded-lg transition duration-200 active">
-                    Explorer Mode
-                </button>
-                <button id="admin-tab" class="tab-button bg-gray-700 hover:bg-gray-600 text-white py-3 px-4 rounded-lg transition duration-200">
-                    Admin Mode
-                </button>
-            </nav>
-        </aside>
+import { addDoc, getDocs, deleteDoc, doc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        <!-- Main content display -->
-        <main class="flex-grow p-6 bg-gray-900 overflow-hidden relative">
-            <!-- Explorer Mode Section -->
-            <section id="explorer-section" class="flex flex-col h-full active">
-                <h2 class="text-2xl font-semibold text-white mb-4">Explorer Mode</h2>
-                <div id="orb-display-area" class="flex-grow w-full h-full relative">
-                    <!-- Three.js Canvas will be appended here -->
-                </div>
-                <div id="command-input-container" class="mt-4">
-                    <input type="text" id="command-input" placeholder="Type 'run' to start orbs..."
-                           class="w-full bg-gray-700 border border-gray-600 rounded-md px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
-                </div>
-            </section>
+let _db;
+let _auth;
+let _appId;
+let _currentUserId;
+let _serverTimestamp;
+let _Papa;
+let _showConfirmModal; // Function to show the custom confirmation modal
+let _collection;
+let _query;
+let _where;
+let _addDoc;
+let _getDocs;
+let _doc;
+let _updateDoc;
+let _deleteDoc;
 
-            <!-- Admin Mode Section -->
-            <section id="admin-section" class="hidden flex flex-col h-full overflow-y-auto">
-                <h2 class="text-2xl font-semibold text-white mb-6">Admin Mode</h2>
+let definitionCounter = 0; // Tracks the number of definition blocks in the form
+let termsCollectionRef; // Reference to the Firestore terms collection
 
-                <!-- Add/Edit Single Term Form -->
-                <div class="bg-gray-800 p-6 rounded-lg shadow-md mb-8">
-                    <h3 class="text-xl font-semibold text-white mb-4">Add/Edit Single Term</h3>
-                    <form id="term-form">
-                        <div class="mb-4">
-                            <label for="term" class="block text-sm font-medium text-gray-300 mb-1">Term</label>
-                            <input type="text" id="term" required
-                                   class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-cyan-500">
-                        </div>
-                        <div class="mb-4">
-                            <label for="note" class="block text-sm font-medium text-gray-300 mb-1">Note (Optional)</label>
-                            <textarea id="note" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-cyan-500" rows="2" placeholder="Any additional notes about the term..."></textarea>
-                        </div>
-                        <div id="definitions-container" class="mb-4 space-y-4">
-                            <!-- Definition blocks will be appended here by JS -->
-                        </div>
-                        <button type="button" id="add-definition-btn"
-                                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 mb-4">
-                            Add Another Definition
-                        </button>
-                        <button type="submit" id="save-term-btn"
-                                class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 flex items-center justify-center">
-                            <span id="save-btn-text">Save Term</span>
-                            <svg id="save-spinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                        </button>
-                        <p id="status-message" class="mt-4 text-sm"></p>
-                    </form>
-                </div>
+// Define expected and alternative column headers as indicators for flexible parsing.
+const COLUMN_MAPPINGS = {
+    'term_indicators': ['term', 'concept', 'word', 'name'],
+    'note_indicators': ['note', 'description', 'summary', 'notes'], // Added 'notes'
+    'definition_indicators': ['definition', 'meaning', 'def', 'deff', 'explanation'], // Matches 'def' from user's CSV
+    'tag_indicators': ['tags', 'keywords', 'categories', 'tag', 'tabs'] // Added 'tabs'
+};
 
-                <!-- Import Terms from CSV -->
-                <div class="bg-gray-800 p-6 rounded-lg shadow-md mb-8">
-                    <h3 class="text-xl font-semibold text-white mb-4">Import Terms from CSV</h3>
-                    <input type="file" id="csv-file-input" accept=".csv"
-                           class="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4
-                                  file:rounded-md file:border-0 file:text-sm file:font-semibold
-                                  file:bg-blue-500 file:text-white hover:file:bg-blue-600
-                                  mb-4 cursor-pointer">
-                    <button type="button" id="import-csv-btn"
-                            class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
-                        Import CSV
-                    </button>
-                    <p id="import-status-message" class="mt-4 text-sm"></p>
-                </div>
+/**
+ * Initializes the Admin module with Firebase instances, user details, and external libraries.
+ * @param {object} db - Firestore database instance.
+ * @param {object} auth - Firebase Auth instance.
+ * @param {string} appId - The application ID.
+ * @param {string} currentUserId - The current authenticated user's ID.
+ * @param {function} serverTimestamp - Firebase serverTimestamp function.
+ * @param {object} Papa - Papa Parse library instance.
+ * @param {function} showConfirmModal - Function to display the custom confirmation modal.
+ * @param {function} collectionFn - The Firestore 'collection' function.
+ * @param {function} queryFn - The Firestore 'query' function.
+ * @param {function} whereFn - The Firestore 'where' function.
+ * @param {function} addDocFn - The Firestore 'addDoc' function.
+ * @param {function} getDocsFn - The Firestore 'getDocs' function.
+ * @param {function} docFn - The Firestore 'doc' function.
+ * @param {function} updateDocFn - The Firestore 'updateDoc' function.
+ * @param {function} deleteDocFn - The Firestore 'deleteDoc' function.
+ */
+export function initAdmin(db, auth, appId, currentUserId, serverTimestamp, Papa, showConfirmModal, collectionFn, queryFn, whereFn, addDocFn, getDocsFn, docFn, updateDocFn, deleteDocFn) {
+    _db = db;
+    _auth = auth;
+    _appId = appId;
+    _currentUserId = currentUserId;
+    _serverTimestamp = serverTimestamp;
+    _Papa = Papa;
+    _showConfirmModal = showConfirmModal;
+    _collection = collectionFn;
+    _query = queryFn;
+    _where = whereFn;
+    _addDoc = addDocFn;
+    _getDocs = getDocsFn;
+    _doc = docFn;
+    _updateDoc = updateDocFn;
+    _deleteDoc = deleteDocFn;
 
-                <!-- Existing Terms (Matrix Viewer) -->
-                <div class="bg-gray-800 p-6 rounded-lg shadow-md flex-grow flex flex-col mb-8">
-                    <h3 class="text-xl font-semibold text-white mb-4">Existing Terms (Matrix Viewer)</h3>
-                    <button type="button" id="refresh-terms-btn"
-                            class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 mb-4 self-start">
-                        Refresh Terms
-                    </button>
-                    <div class="terms-matrix-container flex-grow relative">
-                        <table id="terms-matrix" class="min-w-full text-sm text-left text-gray-400">
-                            <thead class="text-xs text-gray-200 uppercase">
-                                <tr>
-                                    <th scope="col" class="py-3 px-6">Term</th>
-                                    <th scope="col" class="py-3 px-6 text-center"># Definitions</th>
-                                    <th scope="col" class="py-3 px-6 text-center"># Tags</th>
-                                </tr>
-                            </thead>
-                            <tbody id="terms-matrix-body">
-                                <!-- Terms will be loaded here by JS -->
-                                <tr><td colspan="3" class="text-center py-4">Loading terms...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+    termsCollectionRef = _collection(_db, `artifacts/${_appId}/public/data/terms`);
 
-                <!-- Clear Database Button -->
-                <div class="bg-red-800 p-6 rounded-lg shadow-md mb-8">
-                    <h3 class="text-xl font-semibold text-white mb-4">Clear All Terms from Database</h3>
-                    <button type="button" id="clear-database-btn"
-                            class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
-                        Clear Database
-                    </button>
-                </div>
-            </section>
-        </main>
-    </div>
+    console.log("Admin module initialized. App ID:", _appId);
 
-    <!-- Confirmation Modal -->
-    <div id="confirmation-modal" class="hidden fixed inset-0 flex items-center justify-center z-50 modal-overlay">
-        <div class="modal-content p-6 rounded-lg shadow-xl max-w-sm w-full mx-4">
-            <h3 id="modal-title" class="text-xl font-semibold text-white mb-4"></h3>
-            <p id="modal-message" class="text-gray-300 mb-6"></p>
-            <div class="flex justify-end space-x-4">
-                <button id="modal-cancel-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
-                    Cancel
-                </button>
-                <button id="modal-confirm-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">
-                    Confirm
-                </button>
-            </div>
-        </div>
-    </div>
+    // UI elements specific to Admin panel - ensure they are present after innerHTML update in index.html
+    const addDefinitionBtn = document.getElementById('add-definition-btn');
+    const termForm = document.getElementById('term-form');
+    const saveTermBtn = document.getElementById('save-term-btn');
+    const refreshTermsBtn = document.getElementById('refresh-terms-btn');
+    const csvFileInput = document.getElementById('csv-file-input');
+    const importCsvBtn = document.getElementById('import-csv-btn');
+    const clearDatabaseBtn = document.getElementById('clear-database-btn');
 
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    // Attach event listeners
+    if (addDefinitionBtn) addDefinitionBtn.addEventListener('click', addDefinitionBlock);
+    if (termForm) termForm.addEventListener('submit', handleSaveTerm);
+    if (refreshTermsBtn) refreshTermsBtn.addEventListener('click', displayTermsMatrix);
+    if (importCsvBtn) importCsvBtn.addEventListener('click', handleImportCsv);
+    if (clearDatabaseBtn) clearDatabaseBtn.addEventListener('click', handleClearDatabase);
 
-        import { initAdmin } from './js/admin.js';
-        import { initExplorer } from './js/explorer.js';
+    // Add an initial definition block when the admin panel loads
+    addDefinitionBlock();
 
-        // --- Global Firebase & App Variables ---
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-orbs-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+    // Set initial state of save button based on authentication
+    if (saveTermBtn) {
+        saveTermBtn.disabled = !(_auth.currentUser && _auth.currentUser.uid);
+    }
 
-        let app;
-        let db;
-        let auth;
-        let currentUserId = 'anonymous'; // Default for unauthenticated users
+    // Display existing terms on load
+    displayTermsMatrix();
+}
 
-        // --- Utility function for custom confirmation modal ---
-        function showConfirmModal(title, message) {
-            return new Promise(resolve => {
-                const modal = document.getElementById('confirmation-modal');
-                const modalTitle = document.getElementById('modal-title');
-                const modalMessage = document.getElementById('modal-message');
-                const confirmBtn = document.getElementById('modal-confirm-btn');
-                const cancelBtn = document.getElementById('modal-cancel-btn');
+/**
+ * Displays existing terms from Firestore in a scrollable matrix (table).
+ */
+async function displayTermsMatrix() {
+    const termsMatrixBody = document.getElementById('terms-matrix-body');
+    if (!termsMatrixBody) return;
 
-                modalTitle.textContent = title;
-                modalMessage.textContent = message;
-                modal.classList.remove('hidden');
+    termsMatrixBody.innerHTML = '<tr><td colspan="3" class="text-center py-4">Loading terms...</td></tr>';
 
-                const handleConfirm = () => {
-                    modal.classList.add('hidden');
-                    confirmBtn.removeEventListener('click', handleConfirm);
-                    cancelBtn.removeEventListener('click', handleCancel);
-                    resolve(true);
-                };
-
-                const handleCancel = () => {
-                    modal.classList.add('hidden');
-                    confirmBtn.removeEventListener('click', handleConfirm);
-                    cancelBtn.removeEventListener('click', handleCancel);
-                    resolve(false);
-                };
-
-                confirmBtn.addEventListener('click', handleConfirm);
-                cancelBtn.addEventListener('click', handleCancel);
-            });
+    try {
+        const snapshot = await _getDocs(termsCollectionRef);
+        if (snapshot.empty) {
+            termsMatrixBody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-gray-400">No terms found in the database.</td></tr>';
+            return;
         }
 
+        let html = '';
+        snapshot.forEach(doc => {
+            const termData = doc.data();
+            html += `
+                <tr class="bg-gray-800 border-b border-gray-700 hover:bg-gray-600">
+                    <th scope="row" class="py-3 px-6 font-medium text-white whitespace-nowrap">${termData.term}</th>
+                    <td class="py-3 px-6 text-center">${termData.indexDefs || 0}</td>
+                    <td class="py-3 px-6 text-center">${termData.indexTags || 0}</td>
+                </tr>
+            `;
+        });
+        termsMatrixBody.innerHTML = html;
+    }
+    catch (error) {
+        console.error("Error fetching terms for matrix:", error);
+        termsMatrixBody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-red-400">Error loading terms: ${error.message}</td></tr>`;
+    }
+}
 
-        // --- Firebase Initialization and Auth ---
-        window.onload = async () => {
-            try {
-                if (Object.keys(firebaseConfig).length > 0) {
-                    app = initializeApp(firebaseConfig);
-                    db = getFirestore(app);
-                    auth = getAuth(app);
+/**
+ * Adds a new definition block to the form for single term entry.
+ */
+function addDefinitionBlock() {
+    definitionCounter++;
+    const definitionsContainer = document.getElementById('definitions-container');
+    if (!definitionsContainer) return;
 
-                    // Sign in with custom token if available, otherwise anonymously
-                    if (initialAuthToken) {
-                        await signInWithCustomToken(auth, initialAuthToken);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
+    const block = document.createElement('div');
+    block.className = 'definition-block bg-gray-700 p-4 rounded-lg border border-gray-600';
+    block.innerHTML = `
+        <label class="block text-sm font-medium text-gray-300 mb-1">Definition ${definitionCounter}</label>
+        <textarea required class="definition-text w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-cyan-500" rows="3" placeholder="Explain the term..."></textarea>
+        <label class="block text-sm font-medium text-gray-300 mt-2 mb-1">Tags (comma-separated, e.g., color:red, type:process, origin:manual)</label>
+        <input type="text" class="definition-tags w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-cyan-500" placeholder="e.g., biology:core, color:green">
+    `;
+    definitionsContainer.appendChild(block);
+}
 
-                    onAuthStateChanged(auth, (user) => {
-                        if (user) {
-                            currentUserId = user.uid;
-                            console.log("Firebase initialized and user signed in:", currentUserId);
-                            // Initialize modules after successful authentication
-                            initAdmin(db, auth, appId, currentUserId, serverTimestamp, Papa, showConfirmModal, collection, query, where, addDoc, getDocs, doc, updateDoc, deleteDoc);
-                            initExplorer(db, appId, collection, query, getDocs); // Pass necessary Firestore functions
-                        } else {
-                            console.log("No user signed in.");
-                            currentUserId = 'anonymous'; // Reset if user signs out
-                        }
-                    });
-                } else {
-                    console.error("Firebase config is missing. Cannot initialize Firebase.");
+/**
+ * Handles the saving of a single term to Firestore.
+ * It will either add a new term or merge with an existing one.
+ * @param {Event} event - The form submission event.
+ */
+async function handleSaveTerm(event) {
+    event.preventDefault();
+
+    const saveTermBtn = document.getElementById('save-term-btn');
+    const saveBtnText = document.getElementById('save-btn-text');
+    const saveSpinner = document.getElementById('save-spinner');
+    const statusMessage = document.getElementById('status-message');
+
+    // Show loading state
+    saveTermBtn.disabled = true;
+    saveBtnText.textContent = 'Saving...';
+    saveSpinner.classList.remove('hidden');
+    statusMessage.textContent = '';
+    statusMessage.classList.remove('text-red-500', 'text-green-500');
+    statusMessage.classList.add('text-yellow-400');
+
+    try {
+        const termInput = document.getElementById('term');
+        const noteInput = document.getElementById('note');
+        const definitionTexts = document.querySelectorAll('.definition-text');
+        const definitionTags = document.querySelectorAll('.definition-tags');
+
+        const termName = termInput ? termInput.value.trim() : '';
+        const note = noteInput ? noteInput.value.trim() : '';
+
+        if (!termName) {
+            statusMessage.textContent = 'Error: Term name is required.';
+            statusMessage.classList.replace('text-yellow-400', 'text-red-500');
+            return;
+        }
+        if (definitionTexts.length === 0 || Array.from(definitionTexts).every(input => !input.value.trim())) {
+            statusMessage.textContent = 'Error: At least one definition is required.';
+            statusMessage.classList.replace('text-yellow-400', 'text-red-500');
+            return;
+        }
+
+        const incomingDefinitions = [];
+        definitionTexts.forEach((textInput, index) => {
+            const definitionText = textInput.value.trim();
+            const tagsInput = definitionTags[index] ? definitionTags[index].value.trim() : '';
+            const tagsArray = tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
+
+            if (definitionText) {
+                incomingDefinitions.push({
+                    text: definitionText,
+                    tags: tagsArray,
+                    origin: 'manual', // Default origin for manual entry
+                    // Using client-side timestamp for definitions within array
+                    createdAt: new Date().toISOString(),
+                    modified: new Date().toISOString()
+                });
+            }
+        });
+
+        if (incomingDefinitions.length === 0) {
+            statusMessage.textContent = 'Error: No valid definitions found. Please fill in at least one.';
+            statusMessage.classList.replace('text-yellow-400', 'text-red-500');
+            return;
+        }
+
+        // Check if term already exists
+        const q = _query(termsCollectionRef, _where('term', '==', termName));
+        const querySnapshot = await _getDocs(q);
+
+        let termId = null;
+        let existingTermData = null;
+
+        if (!querySnapshot.empty) {
+            termId = querySnapshot.docs[0].id;
+            existingTermData = querySnapshot.docs[0].data();
+        }
+
+        let definitionsToSave = existingTermData ? [...existingTermData.definitions] : [];
+        let definitionsAddedCount = 0;
+        let definitionsUpdatedCount = 0;
+
+        incomingDefinitions.forEach(newDef => {
+            const existingDefIndex = definitionsToSave.findIndex(def => def.text === newDef.text);
+
+            if (existingDefIndex !== -1) {
+                // Definition exists, check if tags need merging/updating
+                const existingDef = definitionsToSave[existingDefIndex];
+                const mergedTags = Array.from(new Set([...(existingDef.tags || []), ...newDef.tags])); // Merge tags, remove duplicates
+
+                if (existingDef.tags.length !== mergedTags.length || !existingDef.tags.every(tag => mergedTags.includes(tag))) {
+                    // Tags have changed or new tags added
+                    definitionsToSave[existingDefIndex] = {
+                        ...existingDef,
+                        tags: mergedTags,
+                        modified: new Date().toISOString() // Client-side timestamp for definition update
+                    };
+                    definitionsUpdatedCount++;
                 }
-            } catch (error) {
-                console.error("Error initializing Firebase or signing in:", error);
-                // Fallback for when Firebase isn't available (e.g., local dev without emulator)
-                initAdmin(null, null, appId, 'anonymous', () => new Date(), Papa, showConfirmModal, null, null, null, null, null, null, null, null);
-                initExplorer(null, appId, null, null, null);
+            } else {
+                // New definition
+                definitionsToSave.push({
+                    ...newDef,
+                    createdAt: new Date().toISOString(), // Client-side timestamp for new definition
+                    modified: new Date().toISOString() // Also add modified for new definitions
+                });
+                definitionsAddedCount++;
+            }
+        });
+
+        const totalIndexDefs = definitionsToSave.length;
+        // CORRECTED: Calculate unique tags across all definitions for the term
+        const allUniqueTags = new Set();
+        definitionsToSave.forEach(def => {
+            if (def.tags) {
+                def.tags.forEach(tag => allUniqueTags.add(tag));
+            }
+        });
+        const totalIndexTags = allUniqueTags.size;
+
+
+        const termDataToSave = {
+            term: termName,
+            note: note,
+            indexDefs: totalIndexDefs,
+            indexTags: totalIndexTags, // Now correctly counts unique tags
+            definitions: definitionsToSave,
+            updatedAt: _serverTimestamp(), // Top-level term update timestamp
+            // createdBy and createdAt are set only for truly new terms
+            ...(termId ? {} : { createdBy: _currentUserId, createdAt: _serverTimestamp() }) // Top-level term creation timestamp
+        };
+
+        if (termId) {
+            // Update existing term
+            await _updateDoc(_doc(_db, `artifacts/${_appId}/public/data/terms`, termId), termDataToSave);
+            statusMessage.textContent = `Term "${termName}" updated successfully! Added ${definitionsAddedCount} new definitions, updated ${definitionsUpdatedCount} definitions.`;
+        } else {
+            // Add new term
+            await _addDoc(termsCollectionRef, dataToSave);
+            statusMessage.textContent = `Term "${termName}" added successfully!`;
+        }
+
+        statusMessage.classList.replace('text-yellow-400', 'text-green-500');
+
+        // Clear the form after successful save
+        termInput.value = '';
+        if (noteInput) noteInput.value = '';
+        document.getElementById('definitions-container').innerHTML = '';
+        definitionCounter = 0;
+        addDefinitionBlock(); // Add back one empty definition block
+        displayTermsMatrix(); // Refresh the displayed terms
+
+    } catch (error) {
+        console.error("Error saving term:", error);
+        statusMessage.textContent = `Error saving term: ${error.message}`;
+        statusMessage.classList.replace('text-yellow-400', 'text-red-500');
+    } finally {
+        // Reset loading state
+        saveTermBtn.disabled = false;
+        saveBtnText.textContent = 'Save Term';
+        saveSpinner.classList.add('hidden');
+    }
+}
+
+/**
+ * Attempts to intelligently map a raw CSV row (array of values) to a rehashed object
+ * based on identified headers and COLUMN_MAPPINGS.
+ * @param {Array<string>} rowValues - An array of values from a single CSV row.
+ * @param {Array<string>} headers - The array of header names from the first row of the CSV.
+ * @returns {object|null} - A rehashed row object with standard keys (term, note, definitionTexts, allTags),
+ * or null if essential data (term or definition) is missing.
+ */
+function rehashCsvRow(rowValues, headers) {
+    const rehashedRow = {
+        term: '',
+        note: '',
+        definitionTexts: [], // To collect all definition values from definition-like columns
+        allTags: new Set()   // To collect all unique tags from tag-like columns
+    };
+    let termFound = false;
+    let definitionFound = false; // To ensure at least one definition is found
+
+    headers.forEach((header, index) => {
+        const lowerHeader = String(header || '').toLowerCase();
+        const value = String(rowValues[index] || '').trim();
+
+        // Check for Term
+        if (!termFound && COLUMN_MAPPINGS.term_indicators.some(indicator => lowerHeader === indicator)) {
+            rehashedRow.term = value;
+            if (value !== '') termFound = true;
+        }
+        // Check for Note
+        else if (COLUMN_MAPPINGS.note_indicators.some(indicator => lowerHeader === indicator)) {
+            rehashedRow.note = value;
+        }
+        // Check for Definitions
+        // Use .includes to match 'def' within 'def1', 'def2' etc.
+        else if (COLUMN_MAPPINGS.definition_indicators.some(indicator => lowerHeader.includes(indicator))) {
+            if (value !== '') {
+                rehashedRow.definitionTexts.push(value);
+                definitionFound = true; // At least one definition text found
+            }
+        }
+        // Check for Tags
+        // Use .includes to match 'tag' within 'tag1', 'tag2' etc.
+        else if (COLUMN_MAPPINGS.tag_indicators.some(indicator => lowerHeader.includes(indicator))) {
+            if (value !== '') {
+                value.split(',').forEach(tag => {
+                    const trimmedTag = tag.trim();
+                    if (trimmedTag) {
+                        rehashedRow.allTags.add(trimmedTag);
+                    }
+                });
+            }
+        }
+    });
+
+    // Final validation: A term and at least one definition text are required
+    if (!termFound || rehashedRow.term === '' || !definitionFound || rehashedRow.definitionTexts.length === 0) {
+        return null; // This row cannot be meaningfully rehashed or is incomplete
+    }
+
+    // Convert Set of tags to an Array
+    rehashedRow.allTags = Array.from(rehashedRow.allTags);
+
+    return rehashedRow;
+}
+
+
+/**
+ * Handles CSV file import, parsing data and merging it into the database.
+ * Includes rehash logic for column mapping.
+ * @param {File} file - The CSV file to import.
+ * @param {string} fileName - The name of the imported file.
+ * @param {HTMLElement} importStatusMessage - The element to display import status.
+ * @param {HTMLInputElement} csvFileInputElement - The file input element to clear after import.
+ */
+async function processCsvFile(file, fileName, importStatusMessage, csvFileInputElement) {
+    importStatusMessage.textContent = `Importing "${fileName}"... (Parsing)`;
+    importStatusMessage.classList.remove('text-red-500', 'text-green-500');
+    importStatusMessage.classList.add('text-yellow-400');
+
+    let rawParsedData; // Renamed to clarify it's the raw array-of-arrays from PapaParse
+    try {
+        console.log(`Attempting to parse CSV file: ${fileName}`);
+        rawParsedData = await new Promise((resolve, reject) => {
+            _Papa.parse(file, {
+                header: false, // CRITICAL CHANGE: Parse as array of arrays, not objects
+                skipEmptyLines: true,
+                dynamicTyping: true, // Attempt to convert numbers/booleans
+                complete: function(results) {
+                    console.log("PapaParse complete results (header: false):", results);
+                    if (results.errors.length) {
+                        reject(new Error(`CSV parsing errors: ${results.errors.map(e => e.message).join('; ')}`));
+                    } else {
+                        resolve(results.data);
+                    }
+                },
+                error: function(err) {
+                    console.error("PapaParse error:", err);
+                    reject(err);
+                }
+            });
+        });
+
+        console.log("Raw Parsed Data (array of arrays):", rawParsedData);
+
+        if (!rawParsedData || rawParsedData.length < 2) { // Need at least 2 rows: headers + 1 data row
+            importStatusMessage.textContent = 'CSV file is empty or missing headers/data.';
+            importStatusMessage.classList.replace('text-yellow-400', 'text-red-500');
+            return;
+        }
+
+        const actualHeaders = rawParsedData[0]; // First row is headers
+        const dataRows = rawParsedData.slice(1); // Rest are data rows
+        console.log("Actual CSV Headers (from first row):", actualHeaders);
+
+        const rehashedAndValidatedData = [];
+        let rowsSkippedDueToRehash = 0;
+        dataRows.forEach((rowValues, index) => { // Iterate over array of values for each row
+            const rehashedRow = rehashCsvRow(rowValues, actualHeaders);
+            if (rehashedRow) {
+                rehashedAndValidatedData.push(rehashedRow);
+            } else {
+                rowsSkippedDueToRehash++;
+                console.warn(`Skipped row ${index + 2} (original CSV row number) due to insufficient data or unmappable columns after rehash:`, rowValues);
+            }
+        });
+
+        console.log("Rehashed and Validated Data (ready for grouping):", rehashedAndValidatedData);
+        if (rehashedAndValidatedData.length === 0) {
+             importStatusMessage.textContent = `No valid terms found in the CSV file after rehash. ${rowsSkippedDueToRehash} rows skipped.`;
+             importStatusMessage.classList.replace('text-yellow-400', 'text-red-500');
+             return;
+        }
+
+
+        importStatusMessage.textContent = `Processing ${rehashedAndValidatedData.length} valid rows from "${fileName}"...`;
+
+        // Group data by term, assuming a single row can provide multiple definitions for one term
+        const termsToProcess = {};
+        rehashedAndValidatedData.forEach(row => {
+            const termName = row.term; // Use the rehashed 'term' key
+            if (!termsToProcess[termName]) {
+                termsToProcess[termName] = {
+                    term: termName,
+                    note: row.note, // Use rehashed 'note' key
+                    definitions: [] // This will store the final definition objects
+                };
             }
 
-            // Tab switching logic
-            const explorerTab = document.getElementById('explorer-tab');
-            const adminTab = document.getElementById('admin-tab');
-            const explorerSection = document.getElementById('explorer-section');
-            const adminSection = document.getElementById('admin-section');
+            // For each definition text found in the row, create a definition object
+            row.definitionTexts.forEach(defText => {
+                termsToProcess[termName].definitions.push({
+                    text: defText,
+                    tags: row.allTags, // Apply all tags collected from the row to each definition
+                    origin: fileName // Origin from the imported file
+                });
+            });
+        });
 
-            explorerTab.addEventListener('click', () => {
-                explorerSection.classList.remove('hidden');
-                explorerTab.classList.add('active');
-                adminSection.classList.add('hidden');
-                adminTab.classList.remove('active');
+        console.log("Terms grouped for processing (before Firestore merge):", termsToProcess);
+        if (Object.keys(termsToProcess).length === 0) {
+            importStatusMessage.textContent = 'No valid terms found in the CSV file after grouping parsed data.';
+            importStatusMessage.classList.replace('text-yellow-400', 'text-red-500');
+            return;
+        }
+
+        let termsAdded = 0;
+        let termsUpdated = 0;
+        let definitionsSkipped = 0;
+        let definitionsAdded = 0;
+        let definitionsUpdated = 0;
+        let totalTermsInCsv = Object.keys(termsToProcess).length;
+        let termsProcessedCount = 0;
+
+        for (const termName in termsToProcess) {
+            termsProcessedCount++;
+            importStatusMessage.textContent = `Processing term ${termsProcessedCount} of ${totalTermsInCsv}: "${termName}"...`;
+            const incomingTermData = termsToProcess[termName];
+
+            // Check if term already exists in Firestore
+            const q = _query(termsCollectionRef, _where('term', '==', termName));
+            const querySnapshot = await _getDocs(q);
+
+            let termDocId = null;
+            let existingTermFirestoreData = null;
+
+            if (!querySnapshot.empty) {
+                termDocId = querySnapshot.docs[0].id;
+                existingTermFirestoreData = querySnapshot.docs[0].data();
+            }
+
+            let definitionsForFirestore = existingTermFirestoreData ? [...(existingTermFirestoreData.definitions || [])] : []; // Ensure definitions array exists
+            let termWasUpdated = false;
+
+            // Merge definitions
+            incomingTermData.definitions.forEach(newDef => {
+                const existingDefIndex = definitionsForFirestore.findIndex(def => def.text === newDef.text);
+
+                if (existingDefIndex !== -1) {
+                    // Definition text is a duplicate. Check and merge tags.
+                    const existingDef = definitionsForFirestore[existingDefIndex];
+                    // Ensure existingDef.tags is an array before spreading
+                    const mergedTags = Array.from(new Set([...(existingDef.tags || []), ...newDef.tags]));
+
+                    if (existingDef.tags.length !== mergedTags.length || !existingDef.tags.every(tag => mergedTags.includes(tag))) {
+                        // Tags have changed or new tags added
+                        definitionsForFirestore[existingDefIndex] = {
+                            ...existingDef,
+                            tags: mergedTags,
+                            modified: new Date().toISOString() // Client-side timestamp for definition update
+                        };
+                        definitionsUpdated++;
+                        termWasUpdated = true;
+                    } else {
+                        definitionsSkipped++; // Definition and tags are identical
+                    }
+                } else {
+                    // New definition
+                    definitionsForFirestore.push({
+                        ...newDef,
+                        createdAt: new Date().toISOString(), // Client-side timestamp for new definition
+                        modified: new Date().toISOString() // Also add modified for new definitions
+                    });
+                    definitionsAdded++;
+                    termWasUpdated = true;
+                }
             });
 
-            adminTab.addEventListener('click', () => {
-                adminSection.classList.remove('hidden');
-                adminTab.classList.add('active');
-                explorerSection.classList.add('hidden');
-                explorerTab.classList.remove('active');
+            // Calculate updated indices
+            const newIndexDefs = definitionsForFirestore.length;
+            // CORRECTED: Calculate unique tags across all definitions for the term
+            const allUniqueTagsForTerm = new Set();
+            definitionsForFirestore.forEach(def => {
+                if (def.tags) {
+                    def.tags.forEach(tag => allUniqueTagsForTerm.add(tag));
+                }
             });
+            const newIndexTags = allUniqueTagsForTerm.size;
 
-            // Ensure initial active tab is set correctly
-            explorerTab.click(); // Default to explorer mode on load
-        };
-    </script>
-</body>
-</html>
+            const dataToSave = {
+                term: incomingTermData.term,
+                note: incomingTermData.note,
+                indexDefs: newIndexDefs,
+                indexTags: newIndexTags, // Now correctly counts unique tags
+                definitions: definitionsForFirestore,
+                updatedAt: _serverTimestamp()
+            };
+
+            if (termDocId) {
+                // Update existing term document
+                await _updateDoc(_doc(_db, `artifacts/${_appId}/public/data/terms`, termDocId), dataToSave);
+                if (termWasUpdated) {
+                    termsUpdated++;
+                }
+            } else {
+                // Add new term document
+                dataToSave.createdBy = _currentUserId;
+                dataToSave.createdAt = _serverTimestamp();
+                await _addDoc(termsCollectionRef, dataToSave);
+                termsAdded++;
+            }
+        }
+
+        importStatusMessage.textContent = `Import complete: ${termsAdded} terms added, ${termsUpdated} terms updated. ${definitionsAdded} new definitions added, ${definitionsUpdated} existing definitions updated, ${definitionsSkipped} definitions skipped. ${rowsSkippedDueToRehash} rows skipped due to rehash issues.`;
+        importStatusMessage.classList.replace('text-yellow-400', 'text-green-500');
+        displayTermsMatrix(); // Refresh the matrix
+        // Clear the file input element's value
+        if (csvFileInputElement) {
+            csvFileInputElement.value = '';
+        }
+
+    } catch (error) {
+        console.error("Error importing CSV:", error);
+        importStatusMessage.textContent = `Error importing CSV: ${error.message}`;
+        importStatusMessage.classList.replace('text-yellow-400', 'text-red-500');
+    }
+}
+
+/**
+ * Handles the 'Import CSV' button click.
+ */
+async function handleImportCsv() {
+    const csvFileInput = document.getElementById('csv-file-input');
+    const importStatusMessage = document.getElementById('import-status-message');
+    if (!csvFileInput || !csvFileInput.files.length) {
+        importStatusMessage.textContent = 'Please select a CSV file.';
+        importStatusMessage.classList.remove('text-yellow-400', 'text-green-500');
+        importStatusMessage.classList.add('text-red-500');
+        return;
+    }
+    const file = csvFileInput.files[0];
+    // Pass the csvFileInput element to processCsvFile so it can clear its value
+    await processCsvFile(file, file.name, importStatusMessage, csvFileInput);
+}
+
+
+/**
+ * Handles clearing all terms from the database with a confirmation step.
+ */
+async function handleClearDatabase() {
+    const clearDatabaseBtn = document.getElementById('clear-database-btn');
+    clearDatabaseBtn.disabled = true; // Disable button during operation
+    const importStatusMessage = document.getElementById('import-status-message'); // Reuse for general status
+
+    const isConfirmed = await _showConfirmModal(
+        "Confirm Database Clear",
+        "This action will permanently delete ALL terms from the database. Are you absolutely sure?"
+    );
+
+    if (!isConfirmed) {
+        console.log("Database clear canceled.");
+        clearDatabaseBtn.disabled = false; // Re-enable button
+        importStatusMessage.textContent = 'Database clear cancelled.';
+        importStatusMessage.classList.remove('text-red-500', 'text-green-500');
+    importStatusMessage.classList.add('text-yellow-400');
+        return;
+    }
+
+    importStatusMessage.textContent = 'Clearing database...';
+    importStatusMessage.classList.remove('text-red-500', 'text-green-500');
+    importStatusMessage.classList.add('text-yellow-400');
+
+    try {
+        const snapshot = await _getDocs(termsCollectionRef);
+        if (snapshot.empty) {
+            importStatusMessage.textContent = 'Database is already empty.';
+            importStatusMessage.classList.replace('text-yellow-400', 'text-green-500');
+            return;
+        }
+
+        const deletePromises = [];
+        snapshot.forEach(docItem => {
+            deletePromises.push(_deleteDoc(_doc(termsCollectionRef, docItem.id)));
+        });
+
+        await Promise.all(deletePromises);
+        importStatusMessage.textContent = `Successfully cleared ${snapshot.size} terms from the database.`;
+        importStatusMessage.classList.replace('text-yellow-400', 'text-green-500');
+        displayTermsMatrix(); // Refresh the matrix to show it's empty
+
+    } catch (error) {
+        console.error("Error clearing database:", error);
+        importStatusMessage.textContent = `Error importing CSV: ${error.message}`;
+        importStatusMessage.classList.replace('text-yellow-400', 'text-red-500');
+    } finally {
+        clearDatabaseBtn.disabled = false; // Re-enable button
+    }
+}
