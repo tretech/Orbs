@@ -271,14 +271,6 @@ async function renderOrbs() {
         const style = getOrbStyle(termItem.tags);
         const geometry = new THREE.SphereGeometry(ORB_RADIUS, 32, 32);
         const material = new THREE.MeshPhongMaterial({
-          color: style.color,
-          transparent: true,
-          opacity: 0.8,
-          shininess: 50
-        });
-        const position = new THREE.Vector3(x, y, z);
-
-        const material = new THREE.MeshPhongMaterial({
             color: new THREE.Color(Math.random() * 0xffffff), // Random color for each orb
             transparent: true,
             opacity: 0.8,
