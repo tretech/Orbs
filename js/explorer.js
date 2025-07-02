@@ -232,7 +232,16 @@ async function renderOrbs() {
         const orbMesh = new THREE.Mesh(geometry, material);
         orbMesh.position.copy(position);
         orbMesh.userData = { term: termsData[i].term, id: termsData[i].id }; // Store term data
+        const tags = termsData[i].tags || [];
+        orbMesh.userData.tags = tags;
 
+        // Example: Calculate style
+        const styleConfig = getOrbStyleFromTags(tags); // Function to define below
+        orbMesh.userData.style = styleConfig;
+
+        // Apply style to orb
+        orbMesh.material.color.set(styleConfig.color);
+        orbMesh.scale.set(styleConfig.size, styleConfig.size, styleConfig.size);
         orbGroup.add(orbMesh);
 
         // Add 2D text label using CanvasTexture for simplicity
@@ -273,7 +282,51 @@ async function renderOrbs() {
     }
     console.log("Orbs rendered successfully.");
 }
+/**
+ * Maps tags to orb style properties: size, pulse frequency, movement speed, and color.
+ * @param {Array} tags - Array of tag strings.
+ * @returns {Object} Style configuration for the orb.
+ */
+function getOrbStyleFromTags(tags) {
+    const tagCount = tags.length;
+    // Clamp maximum tag influence to avoid extremes
+    const maxTags = 6;
 
+    // Size: range 0.8 - 1.5
+    const size = 0.8 + Math.min(tagCount, maxTags) * 0.12;
+
+    // Pulse frequency: range 0.5 - 1.5 Hz
+    const pulseFreq = 0.5 + Math.min(tagCount, maxTags) * 0.18;
+
+    // Movement speed: range 0.01 - 0.045
+    const speed = 0.01 + Math.min(tagCount, maxTags) * 0.007;
+
+    // Color: Hash first tag to a color, or default if no tags
+    const baseColor = tags[0]
+        ? stringToColor(tags[0])
+        : "#00bfff";
+
+    return {
+        size,
+        pulseFreq,
+        speed,
+        color: baseColor
+    };
+}
+
+/**
+ * Utility: Hash a string to a color hex.
+ * @param {string} str
+ * @returns {string} Hex color string.
+ */
+function stringToColor(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    let color = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+    return "#" + "00000".substring(0, 6 - color.length) + color;
+}
 /**
  * Handles commands entered into the input field.
  * @param {string} fullCommandInput - The full command string from the input field.
@@ -292,7 +345,16 @@ async function handleCommand(fullCommandInput) {
         // If no colon, treat the whole input as the command
         actualCommand = fullCommandInput.toLowerCase();
     }
+    const tags = termsData[i].tags || [];
+orbMesh.userData.tags = tags;
 
+// Example: Calculate style
+const styleConfig = getOrbStyleFromTags(tags); // Function to define below
+orbMesh.userData.style = styleConfig;
+
+// Apply style to orb
+orbMesh.material.color.set(styleConfig.color);
+orbMesh.scale.set(styleConfig.size, styleConfig.size, styleConfig.size);
     console.log(`Executing command: '${commandPrefix}' with value: '${actualCommand}'`);
 
     switch (commandPrefix) {
