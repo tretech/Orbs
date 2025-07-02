@@ -11,7 +11,7 @@ let _getDocs;
 let scene, camera, renderer;
 let orbGroup; // Group to hold all orbs
 let termsData = []; // Array to store fetched terms
-const ORB_RADIUS = 0.5; // Radius for the sphere representing an orb
+const ORB_RADIUS = 0.5; // Base radius for the sphere representing an orb
 const FONT_SIZE = 0.3; // Approximate font size for term labels
 
 // Mouse interaction variables
@@ -76,7 +76,6 @@ export function initExplorer(db, appId, collectionFn, queryFn, getDocsFn) {
         const deltaY = event.clientY - previousMouseY;
 
         // Rotate the orbGroup based on mouse movement
-        // Increase sensitivity for smoother rotation
         orbGroup.rotation.y += deltaX * 0.005;
         orbGroup.rotation.x += deltaY * 0.005;
 
@@ -145,10 +144,8 @@ function onWindowResize() {
 function animate() {
     requestAnimationFrame(animate);
 
-    // Rotate the orb group slowly
-    if (orbGroup) {
-        // orbGroup.rotation.y += 0.001; // Continuous slow rotation (optional)
-    }
+    // PHASE 1: Orb autonomy and personality - update orb motion each frame
+    updateOrbMotion();
 
     renderer.render(scene, camera);
 }
@@ -195,7 +192,6 @@ async function renderOrbs() {
     }
     console.log("Existing orbs cleared.");
 
-
     if (termsData.length === 0) {
         const commandInput = document.getElementById('command-input');
         commandInput.placeholder = "No terms found. Import some in Admin Mode first. Type 'run:' to try again.";
@@ -224,24 +220,30 @@ async function renderOrbs() {
 
         // Create orb mesh
         const material = new THREE.MeshPhongMaterial({
-            color: new THREE.Color(Math.random() * 0xffffff), // Random color for each orb
+            color: 0xffffff, // Will be set below
             transparent: true,
             opacity: 0.8,
             shininess: 50
         });
         const orbMesh = new THREE.Mesh(geometry, material);
         orbMesh.position.copy(position);
-        orbMesh.userData = { term: termsData[i].term, id: termsData[i].id }; // Store term data
-        const tags = termsData[i].tags || [];
-        orbMesh.userData.tags = tags;
 
-        // Example: Calculate style
-        const styleConfig = getOrbStyleFromTags(tags); // Function to define below
+        // PHASE 1: Tag mapping and style
+        const tags = termsData[i].tags || [];
+        orbMesh.userData = {
+            term: termsData[i].term,
+            id: termsData[i].id,
+            tags: tags
+        };
+
+        // Calculate and store style
+        const styleConfig = getOrbStyleFromTags(tags);
         orbMesh.userData.style = styleConfig;
 
         // Apply style to orb
         orbMesh.material.color.set(styleConfig.color);
         orbMesh.scale.set(styleConfig.size, styleConfig.size, styleConfig.size);
+
         orbGroup.add(orbMesh);
 
         // Add 2D text label using CanvasTexture for simplicity
@@ -282,7 +284,63 @@ async function renderOrbs() {
     }
     console.log("Orbs rendered successfully.");
 }
+
 /**
+ * Handles commands entered into the input field.
+ * @param {string} fullCommandInput - The full command string from the input field.
+ */
+async function handleCommand(fullCommandInput) {
+    const commandInput = document.getElementById('command-input');
+    let commandPrefix = '';
+    let actualCommand = '';
+
+    // Split the command by the first colon to differentiate prefix from command
+    const parts = fullCommandInput.split(':');
+    if (parts.length > 1) {
+        commandPrefix = parts[0].trim().toLowerCase();
+        actualCommand = parts.slice(1).join(':').trim().toLowerCase(); // Rejoin if command itself has colons
+    } else {
+        // If no colon, treat the whole input as the command
+        actualCommand = fullCommandInput.toLowerCase();
+    }
+
+    console.log(`Executing command: '${commandPrefix}' with value: '${actualCommand}'`);
+
+    switch (commandPrefix) {
+        case 'run':
+            commandInput.placeholder = "Loading orbs...";
+            termsData = await fetchTerms(); // Re-fetch in case new terms were added
+            if (termsData.length > 0) {
+                renderOrbs();
+                commandInput.placeholder = `Orbs active! Displaying ${termsData.length} terms. Type 'clear:' to reset or 'run:' again.`;
+            } else {
+                commandInput.placeholder = "No terms found. Import some in Admin Mode first. Type 'run:' to try again.";
+            }
+            break;
+        case 'clear':
+            while (orbGroup.children.length > 0) {
+                const child = orbGroup.children[0];
+                orbGroup.remove(child);
+                // Dispose of geometry, material, texture to free up memory
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+                if (child.map) child.map.dispose();
+            }
+            commandInput.placeholder = "Orbs cleared. Type 'run:' to restart.";
+            console.log("Orbs cleared successfully.");
+            break;
+        case 'list': // For debugging
+            console.log("Current Terms:", termsData);
+            commandInput.placeholder = "Terms listed in console. Type 'run:' to restart.";
+            break;
+        default:
+            commandInput.placeholder = `Unknown command or format. Try 'run:', 'clear:', or 'list:'.`;
+            break;
+    }
+}
+
+/**
+ * PHASE 1: Tag-to-style function.
  * Maps tags to orb style properties: size, pulse frequency, movement speed, and color.
  * @param {Array} tags - Array of tag strings.
  * @returns {Object} Style configuration for the orb.
@@ -327,65 +385,42 @@ function stringToColor(str) {
     let color = (hash & 0x00FFFFFF).toString(16).toUpperCase();
     return "#" + "00000".substring(0, 6 - color.length) + color;
 }
+
 /**
- * Handles commands entered into the input field.
- * @param {string} fullCommandInput - The full command string from the input field.
+ * PHASE 1: Update orb positions and style per frame using simple repulsion and attraction.
+ * Called in animate().
  */
-async function handleCommand(fullCommandInput) {
-    const commandInput = document.getElementById('command-input');
-    let commandPrefix = '';
-    let actualCommand = '';
-
-    // Split the command by the first colon to differentiate prefix from command
-    const parts = fullCommandInput.split(':');
-    if (parts.length > 1) {
-        commandPrefix = parts[0].trim().toLowerCase();
-        actualCommand = parts.slice(1).join(':').trim().toLowerCase(); // Rejoin if command itself has colons
-    } else {
-        // If no colon, treat the whole input as the command
-        actualCommand = fullCommandInput.toLowerCase();
-    }
-    const tags = termsData[i].tags || [];
-orbMesh.userData.tags = tags;
-
-// Example: Calculate style
-const styleConfig = getOrbStyleFromTags(tags); // Function to define below
-orbMesh.userData.style = styleConfig;
-
-// Apply style to orb
-orbMesh.material.color.set(styleConfig.color);
-orbMesh.scale.set(styleConfig.size, styleConfig.size, styleConfig.size);
-    console.log(`Executing command: '${commandPrefix}' with value: '${actualCommand}'`);
-
-    switch (commandPrefix) {
-        case 'run':
-            commandInput.placeholder = "Loading orbs...";
-            termsData = await fetchTerms(); // Re-fetch in case new terms were added
-            if (termsData.length > 0) {
-                renderOrbs();
-                commandInput.placeholder = `Orbs active! Displaying ${termsData.length} terms. Type 'clear:' to reset or 'run:' again.`;
-            } else {
-                commandInput.placeholder = "No terms found. Import some in Admin Mode first. Type 'run:' to try again.";
+function updateOrbMotion() {
+    if (!orbGroup) return;
+    // Only consider Meshes (not Sprites) for motion
+    const orbs = orbGroup.children.filter(child => child.type === 'Mesh');
+    for (let i = 0; i < orbs.length; i++) {
+        let orbA = orbs[i];
+        let force = new THREE.Vector3(0, 0, 0);
+        for (let j = 0; j < orbs.length; j++) {
+            if (i === j) continue;
+            let orbB = orbs[j];
+            let diff = new THREE.Vector3().subVectors(orbA.position, orbB.position);
+            let dist = diff.length();
+            if (dist < 0.1) dist = 0.1; // Prevent division by zero
+            // Repulsive force
+            let repulse = diff.normalize().multiplyScalar(orbA.userData.style.speed / dist);
+            force.add(repulse);
+            // Optional: Attraction if shared tags
+            if (orbA.userData.tags && orbB.userData.tags) {
+                const shared = orbA.userData.tags.filter(tag => orbB.userData.tags.includes(tag));
+                if (shared.length > 0) {
+                    let attract = diff.normalize().multiplyScalar(-0.002 * shared.length);
+                    force.add(attract);
+                }
             }
-            break;
-        case 'clear':
-            while (orbGroup.children.length > 0) {
-                const child = orbGroup.children[0];
-                orbGroup.remove(child);
-                // Dispose of geometry, material, texture to free up memory
-                if (child.geometry) child.geometry.dispose();
-                if (child.material) child.material.dispose();
-                if (child.map) child.map.dispose();
-            }
-            commandInput.placeholder = "Orbs cleared. Type 'run:' to restart.";
-            console.log("Orbs cleared successfully.");
-            break;
-        case 'list': // For debugging
-            console.log("Current Terms:", termsData);
-            commandInput.placeholder = "Terms listed in console. Type 'run:' to restart.";
-            break;
-        default:
-            commandInput.placeholder = `Unknown command or format. Try 'run:', 'clear:', or 'list:'.`;
-            break;
+        }
+        // Apply force (move orb slightly)
+        orbA.position.add(force);
+
+        // Pulse animation
+        const scaleBase = orbA.userData.style.size;
+        const pulse = 1 + Math.sin(Date.now() * 0.001 * orbA.userData.style.pulseFreq) * 0.08;
+        orbA.scale.set(scaleBase * pulse, scaleBase * pulse, scaleBase * pulse);
     }
 }
