@@ -244,14 +244,38 @@ async function renderOrbs() {
     const startX = -(maxDimension / 2) * spacing;
     const startY = -(maxDimension / 2) * spacing;
     const startZ = -5; // Start a bit behind the camera
+    // Tag-to-trait style map
+    const tagStyleMap = {
+      science: { color: 0x4fc3f7, pulseFreq: 0.01, velocity: 0.005 },
+      emotion: { color: 0xff4081, pulseFreq: 0.02, velocity: 0.008 },
+      philosophy: { color: 0x9575cd, pulseFreq: 0.015, velocity: 0.006 },
+      technology: { color: 0x00e676, pulseFreq: 0.012, velocity: 0.006 },
+      art: { color: 0xffc107, pulseFreq: 0.018, velocity: 0.007 }
+    };
+    function getOrbStyle(tags) {
+      const defaults = { color: 0xffffff, pulseFreq: 0.01, velocity: 0.005 };
+      if (!tags || tags.length === 0) return defaults;
 
+      for (const tag of tags) {
+        if (tagStyleMap[tag]) return tagStyleMap[tag];
+      }
+
+      return defaults;
+    }
     console.log(`Rendering ${numOrbs} orbs...`);
     termsData.forEach((termItem, index) => {
         // Simple grid positioning for now, can be replaced with more complex physics positioning later
         const x = startX + (index % maxDimension) * spacing;
         const y = startY + Math.floor(index / maxDimension) * spacing;
         const z = startZ + (Math.random() - 0.5) * spacing; // Add some depth variation
-
+        const style = getOrbStyle(termItem.tags);
+        const geometry = new THREE.SphereGeometry(ORB_RADIUS, 32, 32);
+        const material = new THREE.MeshPhongMaterial({
+          color: style.color,
+          transparent: true,
+          opacity: 0.8,
+          shininess: 50
+        });
         const position = new THREE.Vector3(x, y, z);
 
         const material = new THREE.MeshPhongMaterial({
@@ -260,10 +284,29 @@ async function renderOrbs() {
             opacity: 0.8,
             shininess: 50
         });
-        const orbMesh = new THREE.Mesh(geometry, material);
+            // Get tag-driven style traits for this orb
+        const style = getOrbStyle(termItem.tags);
+
+            // Create orb mesh
+        const orbMesh = new THREE.Mesh(geometry, new THREE.MeshPhongMaterial({
+          color: style.color,
+          transparent: true,
+          opacity: 0.8,
+          shininess: 50
+        }));
+
         orbMesh.position.copy(position);
         orbMesh.name = `orb-${termItem.id}`; // Give it a unique name for raycasting
-        orbMesh.userData = { term: termItem, originalPosition: position.clone(), originalScale: orbMesh.scale.clone() }; // Store term data and original state
+
+            // Attach all necessary metadata and traits
+        orbMesh.userData = {
+          term: termItem,
+          originalPosition: position.clone(),
+          originalScale: orbMesh.scale.clone(),
+          tags: termItem.tags || [],
+          pulseFreq: style.pulseFreq,
+          velocity: style.velocity
+        };
 
         orbGroup.add(orbMesh);
 
