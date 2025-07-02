@@ -100,22 +100,33 @@ export function initAdmin(db, auth, appId, currentUserId, serverTimestamp, Papa,
 /**
  * Displays existing terms from Firestore in a scrollable matrix (table).
  */
+// js/admin.js
 async function displayTermsMatrix() {
     const termsMatrixBody = document.getElementById('terms-matrix-body');
-    if (!termsMatrixBody) return;
+    if (!termsMatrixBody) {
+        console.error("Error: terms-matrix-body element not found!");
+        return;
+    }
 
     termsMatrixBody.innerHTML = '<tr><td colspan="3" class="text-center py-4">Loading terms...</td></tr>';
+    console.log("displayTermsMatrix: Started. Displaying 'Loading terms...' message.");
 
     try {
-        const snapshot = await _getDocs(termsCollectionRef);
+        console.log("displayTermsMatrix: Attempting to get documents from Firestore. Collection Ref:", termsCollectionRef);
+        const snapshot = await _getDocs(termsCollectionRef); // THIS IS THE CRITICAL LINE
+        console.log("displayTermsMatrix: _getDocs call completed. Snapshot received.");
+
         if (snapshot.empty) {
+            console.log("displayTermsMatrix: Snapshot is empty. No terms found in the database.");
             termsMatrixBody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-gray-400">No terms found in the database.</td></tr>';
             return;
         }
 
+        console.log(`displayTermsMatrix: Found ${snapshot.docs.length} terms. Populating table.`);
         let html = '';
         snapshot.forEach(doc => {
             const termData = doc.data();
+            // console.log("Term Data:", termData); // Uncomment this if you want to see each term's data
             html += `
                 <tr class="bg-gray-800 border-b border-gray-700 hover:bg-gray-600">
                     <th scope="row" class="py-3 px-6 font-medium text-white whitespace-nowrap">${termData.term}</th>
@@ -125,9 +136,10 @@ async function displayTermsMatrix() {
             `;
         });
         termsMatrixBody.innerHTML = html;
+        console.log("displayTermsMatrix: Table populated successfully.");
     }
     catch (error) {
-        console.error("Error fetching terms for matrix:", error);
+        console.error("displayTermsMatrix: Error fetching terms for matrix:", error);
         termsMatrixBody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-red-400">Error loading terms: ${error.message}</td></tr>`;
     }
 }
