@@ -1,14 +1,13 @@
 // js/explorer.js
 // This file contains all logic specific to the Explorer Mode.
 
-// Core Three.js
-import * as THREE from 'https://unpkg.com/three@0.165.0/build/three.module.js';
+// Core Three.js via importmap
+import * as THREE from 'three';
 
-// Post-processing modules
-
-import { EffectComposer } from 'https://unpkg.com/three@0.165.0/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'https://unpkg.com/three@0.165.0/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'https://unpkg.com/three@0.165.0/examples/jsm/postprocessing/UnrealBloomPass.js';
+// Post-processing via mapped imports
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 
 let _db;
 let _appId;
