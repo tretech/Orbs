@@ -8,6 +8,20 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+// 🔧 Utility function to wait for DOM layout
+function waitForDisplayArea(callback) {
+    const checkSize = () => {
+        const width = orbDisplayArea.clientWidth;
+        const height = orbDisplayArea.clientHeight;
+        if (width > 0 && height > 0) {
+            callback();
+        } else {
+            console.warn("Waiting for orb display area to size...");
+            setTimeout(checkSize, 100);
+        }
+    };
+    checkSize();
+}
 
 let _db;
 let _appId;
@@ -54,7 +68,7 @@ export function initExplorer(db, appId, collectionFn, queryFn, getDocsFn) {
     }
 
     // Setup scene, camera, and renderer, and post-processing composer
-    setupScene(orbDisplayArea);
+    waitForDisplayArea(() => setupScene(orbDisplayArea));
     // Add lighting to the scene
     setupLighting();
     // Setup mouse interaction for scene manipulation
@@ -69,6 +83,11 @@ export function initExplorer(db, appId, collectionFn, queryFn, getDocsFn) {
  * @param {HTMLElement} orbDisplayArea - The DOM element where the Three.js canvas will be rendered.
  */
 function setupScene(orbDisplayArea) {
+    if (orbDisplayArea.clientWidth === 0 || orbDisplayArea.clientHeight === 0) {
+    console.warn("Orb display area not yet sized. Delaying scene setup...");
+    setTimeout(() => setupScene(orbDisplayArea), 100); // try again in 100ms
+    return;
+}
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0a0a0a); // Very dark gray/black background for contrast
 
