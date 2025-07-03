@@ -10,13 +10,111 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
 
     <style>
-        /* ... your existing CSS ... */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Dark background */
+            color: #e2e8f0; /* Light gray text */
+        }
+        .tab-button.active {
+            @apply bg-cyan-700 text-white;
+        }
+        /* Custom styles for confirmation modal */
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+        .modal-content {
+            background-color: #2d3748;
+        }
     </style>
 </head>
 <body>
+    <div id="app" class="min-h-screen flex flex-col items-center justify-center p-4">
+        <h1 class="text-4xl font-bold text-white mb-6">Orbs System</h1>
+
+        <div class="w-full max-w-4xl bg-gray-800 rounded-lg shadow-xl p-6 mb-6">
+            <div class="flex border-b border-gray-700 mb-4">
+                <button id="explorer-tab" class="tab-button px-4 py-2 text-lg font-semibold text-gray-400 hover:text-white focus:outline-none">
+                    Explorer
+                </button>
+                <button id="admin-tab" class="tab-button px-4 py-2 text-lg font-semibold text-gray-400 hover:text-white focus:outline-none">
+                    Admin
+                </button>
+            </div>
+
+            <section id="explorer-section" class="hidden">
+                <h2 class="text-2xl font-bold text-white mb-4">Explorer Mode</h2>
+                <div id="orb-display-area" class="w-full bg-gray-900 rounded-lg shadow-inner mb-4 flex items-center justify-center relative overflow-hidden" style="height: 500px;">
+                    <p id="initial-message" class="text-gray-500 text-lg">Type 'run:' below to load Orbs...</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <label for="command-input" class="text-white text-lg">Command:</label>
+                    <input type="text" id="command-input" placeholder="Type 'run:', 'clear:', 'list:'"
+                           class="flex-grow p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-cyan-500">
+                </div>
+            </section>
+
+            <section id="admin-section" class="hidden">
+                <h2 class="text-2xl font-bold text-white mb-4">Admin Mode</h2>
+
+                <div class="space-y-6">
+                    <div class="bg-gray-700 p-4 rounded-lg">
+                        <h3 class="text-xl font-semibold text-white mb-3">Add/Update Term</h3>
+                        <form id="term-form" class="space-y-3">
+                            <div>
+                                <label for="term-input" class="block text-gray-300 text-sm font-bold mb-1">Term:</label>
+                                <input type="text" id="term-input" placeholder="Enter term (e.g., Quantum Physics)"
+                                       class="w-full p-2 rounded bg-gray-800 text-white border border-gray-600">
+                            </div>
+                            <div>
+                                <label for="note-input" class="block text-gray-300 text-sm font-bold mb-1">Note (Optional):</label>
+                                <textarea id="note-input" placeholder="Add a brief note or description"
+                                          class="w-full p-2 rounded bg-gray-800 text-white border border-gray-600"></textarea>
+                            </div>
+                            <div id="definitions-container" class="space-y-2">
+                                <label class="block text-gray-300 text-sm font-bold mb-1">Definitions:</label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="text" name="definition" placeholder="Enter definition"
+                                           class="flex-grow p-2 rounded bg-gray-800 text-white border border-gray-600">
+                                    <button type="button" class="remove-definition-btn text-red-500 hover:text-red-700 text-xl font-bold">&times;</button>
+                                </div>
+                            </div>
+                            <button type="button" id="add-definition-btn" class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-white text-sm">Add Definition</button>
+                            <div>
+                                <label for="tags-input" class="block text-gray-300 text-sm font-bold mb-1">Tags (comma-separated):</label>
+                                <input type="text" id="tags-input" placeholder="e.g., science, physics, theory"
+                                       class="w-full p-2 rounded bg-gray-800 text-white border border-gray-600">
+                            </div>
+                            <div class="flex space-x-2">
+                                <button type="submit" id="save-term-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white font-semibold">Save Term</button>
+                                <button type="button" id="clear-form-btn" class="px-4 py-2 bg-gray-500 hover:bg-gray-600 rounded text-white font-semibold">Clear Form</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="bg-gray-700 p-4 rounded-lg">
+                        <h3 class="text-xl font-semibold text-white mb-3">Import/Export Data</h3>
+                        <input type="file" id="csv-file-input" accept=".csv" class="mb-3 block w-full text-white text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                        <button id="import-csv-btn" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-white font-semibold mr-2">Import CSV</button>
+                        <button id="export-csv-btn" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded text-white font-semibold">Export CSV</button>
+                        <button id="clear-db-btn" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-white font-semibold ml-2">Clear Database</button>
+                        <p id="import-status-message" class="text-sm mt-2 text-gray-300"></p>
+                    </div>
+
+                    <div class="bg-gray-700 p-4 rounded-lg">
+                        <h3 class="text-xl font-semibold text-white mb-3">All Terms</h3>
+                        <div id="terms-matrix" class="overflow-x-auto">
+                            <p class="text-gray-400">Loading terms...</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
     <script type="module">
-        // Import Firebase modules here, as admin.js and explorer.js will now be modules.
-        // This ensures Firebase is initialized before other modules that use it.
+        // Import Firebase modules directly into this script block.
+        // This script runs as a module, allowing local modules (admin.js, explorer.js)
+        // to also be modules and access Firebase functions passed from here.
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, query, where, addDoc, getDocs, doc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -33,9 +131,11 @@
             storageBucket: "orbdefine.firebasestorage.app",
             messagingSenderId: "247935667317",
             appId: "1:247935667317:web:2dff8b9b44848553fafc3c",
-            measurementId: "G-0VGTHSL2VZ"
+            measurementId: "G-0VGTHSL2VZ" // Keep this if it's there
         };
-        const appId = "1:247935667317:web:2dff8b9b44848553fafc3c"; // Ensure this matches your Firestore collection structure
+
+        // This appId is crucial for your Firestore collection path (e.g., artifacts/YOUR_APP_ID/public/data/terms)
+        const appId = "1:247935667317:web:2dff8b9b44848553fafc3c";
 
         // Initialize Firebase
         const app = initializeApp(firebaseConfig);
@@ -83,6 +183,10 @@
                     // onAuthStateChanged will be called again with the anonymous user
                 } catch (error) {
                     console.error("Error during anonymous sign-in:", error);
+                    // Fallback for when Firebase isn't available (e.g., local dev without emulator)
+                    // If signInAnonymously fails, proceed with null DB/Auth to allow UI to load
+                    initAdmin(null, null, appId, 'anonymous', () => new Date(), Papa, showConfirmModal, null, null, null, null, null, null, null);
+                    initExplorer(null, appId, null, null, null);
                 }
             }
             // Once authentication state is known, initialize modules
@@ -90,7 +194,7 @@
             initAdmin(db, auth, appId, currentUserId, serverTimestamp, Papa, showConfirmModal, collection, query, where, addDoc, getDocs, doc, updateDoc, deleteDoc);
             initExplorer(db, appId, collection, query, getDocs);
 
-            // Tab switching logic (already in your file)
+            // Tab switching logic
             const explorerTab = document.getElementById('explorer-tab');
             const adminTab = document.getElementById('admin-tab');
             const explorerSection = document.getElementById('explorer-section');
@@ -112,7 +216,7 @@
 
             // Ensure initial active tab is set correctly
             explorerTab.click(); // Default to explorer mode on load
-        });
+        }); // <-- CORRECTED: Changed '};' to '});'
     </script>
 </body>
 </html>
