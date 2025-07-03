@@ -9,7 +9,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 // 🔧 Utility function to wait for DOM layout
-function waitForDisplayArea(callback) {
+function waitForDisplayArea(orbDisplayArea, callback) {
     const checkSize = () => {
         const width = orbDisplayArea.clientWidth;
         const height = orbDisplayArea.clientHeight;
@@ -68,7 +68,7 @@ export function initExplorer(db, appId, collectionFn, queryFn, getDocsFn) {
     }
 
     // Setup scene, camera, and renderer, and post-processing composer
-    waitForDisplayArea(() => setupScene(orbDisplayArea));
+    waitForDisplayArea(orbDisplayArea, () => setupScene(orbDisplayArea));
     // Add lighting to the scene
     setupLighting();
     // Setup mouse interaction for scene manipulation
