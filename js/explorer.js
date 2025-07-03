@@ -1,7 +1,7 @@
 // js/explorer.js
 // This file contains all logic specific to the Explorer Mode.
 
-// Import core Three.js (required since we removed the global script tag in index.html)
+// Import core Three.js
 import * as THREE from 'https://unpkg.com/three@0.128.0/build/three.module.js';
 
 // Import Post-processing classes for Bloom effect
@@ -202,6 +202,11 @@ function setupOrbsAreaInteraction(orbDisplayArea, commandInput) {
  * Fetches terms from Firestore.
  */
 async function fetchTerms() {
+    // Only attempt to fetch if Firestore is initialized
+    if (!_db || !_collection || !_query || !_getDocs) {
+        console.warn("Firestore functions not available. Cannot fetch terms.");
+        return [];
+    }
     const termsCollectionRef = _collection(_db, `artifacts/${_appId}/public/data/terms`);
     const q = _query(termsCollectionRef);
     const snapshot = await _getDocs(q);
@@ -259,16 +264,12 @@ function renderOrbs() {
 
         const sphereGeometry = new THREE.SphereGeometry(scaledRadius, 32, 32);
 
-        // --- UPDATED MATERIAL FOR BLOOM EFFECT ---
-        // MeshPhongMaterial responds to lights and has an 'emissive' property
-        // The emissive property defines the color that the material emits,
-        // which the UnrealBloomPass will pick up and make glow.
         const orbMaterial = new THREE.MeshPhongMaterial({
-            color: termColor,       // Base color
-            shininess: 80,          // How shiny the surface is
-            specular: new THREE.Color(0x555555), // Color of specular highlights
-            emissive: termColor,    // Orb's color emits light (this is key for bloom)
-            emissiveIntensity: 0.5  // How strong the emissive light is (adjust from 0.1 to 1.0)
+            color: termColor,
+            shininess: 80,
+            specular: new THREE.Color(0x555555),
+            emissive: termColor,
+            emissiveIntensity: 0.5
         });
 
         const orb = new THREE.Mesh(sphereGeometry, orbMaterial);
@@ -365,6 +366,7 @@ function applyForces() {
         const pulseFactor = 1 + Math.sin(Date.now() * pulseSpeed) * 0.1;
         orbA.scale.setScalar(pulseFactor);
 
+        // Update sprite position to stay with its orb
         const sprite = orbGroup.children.find(child => child.isSprite && child.position.x === orbA.position.x && child.position.y === orbA.position.y);
         if (sprite) {
             sprite.position.set(orbA.position.x, orbA.position.y + orbA.geometry.parameters.radius * orbA.scale.y + FONT_SIZE * 0.5, orbA.position.z);
