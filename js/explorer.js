@@ -3,6 +3,7 @@
 
 // Core Three.js via importmap
 import * as THREE from 'three';
+import { update as TWEENUpdate, Tween as newTween, Easing } from 'https://cdn.jsdelivr.net/npm/@tweenjs/tween.js@18.6.4/dist/tween.esm.js';
 
 // Post-processing via mapped imports
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
@@ -174,23 +175,23 @@ function setupOrbsAreaInteraction(orbDisplayArea, commandInput) {
         function focusOnOrb(orb) {
             focusedOrb = orb;
             // Animate to center
-            new TWEEN.Tween(orb.position)
+            newTween(orb.position)
                 .to({ x: 0, y: 0, z: 0 }, 800)
-                .easing(TWEEN.Easing.Quadratic.Out)
+                .easing(Easing.Quadratic.Out)
                 .start();
             
             // Animate scale up
-            new TWEEN.Tween(orb.scale)
+            newTween(orb.scale)
                 .to({ x: 2, y: 2, z: 2 }, 1000)
-                .easing(TWEEN.Easing.Elastic.Out)
+                .easing(Easing.Elastic.Out)
                 .start();
             
             // Optional: shrink others
             orbGroup.children.forEach(child => {
                 if (child !== orb && child.isMesh) {
-                    new TWEEN.Tween(child.scale)
+                    newTween(child.scale)
                         .to({ x: 0.1, y: 0.1, z: 0.1 }, 500)
-                        .easing(TWEEN.Easing.Quadratic.InOut)
+                        .easing(Easing.Quadratic.InOut)
                         .start();
                 }
             });
@@ -451,7 +452,7 @@ function animate() {
 
     applyForces();
 
-    TWEEN.update(); // ← This is the magic line ✨
+    TWEENupdate(); // ← This is the magic line ✨
 
     // Render the scene using the EffectComposer for post-processing effects
     if (composer) {
