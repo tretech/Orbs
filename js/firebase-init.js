@@ -17,7 +17,11 @@ export function initializeFirebase(showConfirmModal) {
       authState.update({ userId: user.uid, isAuthenticated: true });
 
       initAdmin(db, auth, appId, user.uid, serverTimestamp, Papa, showConfirmModal, collection, query, where, addDoc, getDocs, doc, updateDoc, deleteDoc);
-      initExplorer(db, appId, collection, query, getDocs);
+      if (document.getElementById('orb-display-area')) {
+        initExplorer(db, appId, collection, query, getDocs);
+      } else {
+        console.warn("Explorer skipped: #orb-display-area not present (possibly due to tab state).");
+      }
     } else {
       try {
         console.log("No user signed in. Attempting anonymous sign-in.");
