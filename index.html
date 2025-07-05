@@ -78,10 +78,11 @@
                 console.log('Signed in anonymously.');
 
                 // Listen for authentication state changes to update the UI with the user's ID.
-                onAuthStateChanged(auth, (user) => {
+                onAuthStateChanged(auth, async (user) => {
                     if (user) {
                         // If a user is logged in (authenticated), use their UID.
                         currentUserId = user.uid;
+                        authState.update({ userId: user.uid, isAuthenticated: true });
                         document.getElementById('firebase-status').textContent = 'Authenticated!';
                         document.getElementById('user-id').textContent = currentUserId;
                         console.log("Firebase initialized and user signed in:", currentUserId);
@@ -93,6 +94,7 @@
                         // This case should ideally not be hit after signInAnonymously,
                         // but handles any potential sign-out or initial states.
                         currentUserId = crypto.randomUUID(); // Fallback for unauthenticated scenarios
+                        authState.update({ userId: crypto.randomUUID(), isAuthenticated: false });
                         document.getElementById('firebase-status').textContent = 'Not Authenticated (Anonymous)';
                         document.getElementById('user-id').textContent = currentUserId;
                         console.log("No user signed in. Using random UUID for user ID:", currentUserId);
@@ -186,6 +188,22 @@
 
         // Initialize Firebase when the window loads to ensure all DOM elements are ready.
         window.onload = initializeFirebase;
+        const authState = {
+            userId: null,
+            isAuthenticated: false,
+            listeners: [],
+            subscribe(fn) {
+                this.listeners.push(fn);
+                // Immediately inform new listeners
+                fn({ userId: this.userId, isAuthenticated: this.isAuthenticated });
+            },
+            update(payload) {
+                Object.assign(this, payload);
+                this.listeners.forEach(fn => fn({ userId: this.userId, isAuthenticated: this.isAuthenticated }));
+            }
+        };
+     
+
 
         // Keyboard Shortcut for Admin Mode (Part of Phase 5 implementation).
         document.addEventListener('keydown', (event) => {
@@ -200,6 +218,7 @@
     <script>
         window.addEventListener('DOMContentLoaded', () => {
             initializeFirebase(); // Make sure this gets called only when DOM is ready
+            
         });
     </script>
 </body>
