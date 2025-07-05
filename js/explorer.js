@@ -452,7 +452,7 @@ function animate() {
 
     applyForces();
 
-    TWEENupdate(); // ← This is the magic line ✨
+    TWEENUpdate(); // ← This is the magic line ✨
 
     // Render the scene using the EffectComposer for post-processing effects
     if (composer) {
