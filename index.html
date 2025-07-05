@@ -116,9 +116,20 @@
 
                     <div class="bg-gray-700 p-4 rounded-lg">
                         <h3 class="text-xl font-semibold text-white mb-3">All Terms</h3>
-                        <div id="terms-matrix" class="overflow-x-auto">
-                            <p class="text-gray-400">Loading terms...</p>
-                        </div>
+                            <div id="terms-matrix" class="overflow-x-auto">
+                                <table class="min-w-full text-sm text-left text-gray-400">
+                                    <thead class="text-xs uppercase bg-gray-600 text-gray-300">
+                                      <tr>
+                                        <th scope="col" class="px-6 py-3">Term</th>
+                                        <th scope="col" class="px-6 py-3 text-center"># Definitions</th>
+                                        <th scope="col" class="px-6 py-3 text-center"># Tags</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody id="terms-matrix-body">
+                                      <!-- Filled dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
                     </div>
                 </div>
             </section>
