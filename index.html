@@ -141,6 +141,7 @@
         // Import Firebase modules directly into this script block.
         // This script runs as a module, allowing local modules (admin.js, explorer.js)
         // to also be modules and access Firebase functions passed from here.
+        import { initializeFirebase } from './js/firebase-init.js';
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, query, where, addDoc, getDocs, doc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
