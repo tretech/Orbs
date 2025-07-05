@@ -457,15 +457,19 @@ async function handleCommand(fullCommandInput) {
             termsData = [];
             commandInput.placeholder = "Orbs cleared. Type 'run:' to load again.";
             break;
-        case 'list':
-            if (termsData.length > 0) {
-                console.log("Current Terms Data:");
-                termsData.forEach(term => console.log(`- ${term.term} (ID: ${term.id})`));
-                commandInput.placeholder = `Listed ${termsData.length} terms to console.`;
-            } else {
-                commandInput.placeholder = "No terms loaded to list. Type 'run:' first.";
-            }
-            break;
+       case 'list':
+    // Inject admin panel markup (if not already present)
+    const mainPanel = document.getElementById('main-panel');
+    if (!document.getElementById('terms-matrix-body')) {
+        mainPanel.innerHTML = renderAdminPanelHTML(); // Replace with your actual render function
+        initAdmin(); // Also make sure this sets up the buttons and calls addDefinitionBlock()
+    }
+
+    // Now safe to call displayTermsMatrix
+    displayTermsMatrix();
+
+    commandInput.placeholder = 'Terms matrix loaded.';
+    break;
         default:
             commandInput.placeholder = `Unknown command or format. Try 'run:', 'clear:', or 'list:'.`;
             break;
