@@ -6,7 +6,7 @@ import { initAdmin } from './admin.js';
 import { initExplorer } from './explorer.js';
 
 // Firebase should already be initialized in index.html
-export function initializeFirebase() {
+export function initializeFirebase(showConfirmModal) {
   const auth = getAuth();
   const db = getFirestore();
   const appId = getAuth().app.options.appId;
