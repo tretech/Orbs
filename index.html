@@ -25,6 +25,9 @@
         .modal-content {
             background-color: #2d3748;
         }
+        html {
+            scroll-behavior: smooth;
+        }
     </style>
 </head>
 <script type="importmap">
@@ -40,11 +43,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@tweenjs/tween.js@18.6.4/dist/tween.umd.js"></script>
 <script type="module" src="js/explorer.js"></script>
 <body>
-    <div id="app" class="min-h-screen flex flex-col items-center justify-center p-4">
+    <div id="app" class="min-h-screen flex flex-col p-4 max-w-screen-xl mx-auto space-y-6">
         <h1 class="text-4xl font-bold text-white mb-6">Orbs System</h1>
-        <div id="orb-display-area" class="w-full h-[600px] relative bg-black">
-          <!-- canvas will attach here -->
-        </div>
         <div class="w-full max-w-4xl bg-gray-800 rounded-lg shadow-xl p-6 mb-6">
             <div class="flex border-b border-gray-700 mb-4">
                 <button id="explorer-tab" class="tab-button px-4 py-2 text-lg font-semibold text-gray-400 hover:text-white focus:outline-none">
@@ -55,15 +55,16 @@
                 </button>
             </div>
 
-            <section id="explorer-section" class="hidden">
+            <section id="explorer-section" class="scroll-mt-16"> <!-- sticky offset for nav -->
                 <h2 class="text-2xl font-bold text-white mb-4">Explorer Mode</h2>
                 <div id="orb-display-area" class="w-full bg-gray-900 rounded-lg shadow-inner mb-4 flex items-center justify-center relative overflow-hidden" style="height: 500px;">
                     <p id="initial-message" class="text-gray-500 text-lg">Type 'run:' below to load Orbs...</p>
                 </div>
-                <div class="flex items-center space-x-4">
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
                     <label for="command-input" class="text-white text-lg">Command:</label>
-                    <input type="text" id="command-input" placeholder="Type 'run:', 'clear:', 'list:'"
-                           class="flex-grow p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-cyan-500">
+                    <input
+                      class="w-full sm:flex-grow p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-cyan-500"
+                    />
                 </div>
             </section>
 
