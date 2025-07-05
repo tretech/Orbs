@@ -336,9 +336,14 @@ function renderOrbs() {
             emissive: termColor,
             emissiveIntensity: 0.5
         });
-
-        const orb = new THREE.Mesh(sphereGeometry, orbMaterial);
-
+        const orbId = crypto.randomUUID(); // Or Date.now() + index for fallback
+        // 🪐 Create Orb
+        const orb = new THREE.Mesh(
+            new THREE.SphereGeometry(term.style.radius || 1, 32, 32),
+            new THREE.MeshStandardMaterial({ color: term.style.color })
+        );
+        orb.position.copy(calculateOrbPosition(index, termsData.length)); // example
+        //creates your stunning spiral layout using the golden angle.
         const angle = index * spiralAngleIncrement;
         const radius = index * spiralRadiusIncrement;
         orb.position.x = radius * Math.cos(angle);
@@ -360,29 +365,31 @@ function renderOrbs() {
         orb.receiveShadow = true;
         orb.castShadow = true;
 
-        orbGroup.add(orb);
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        const fontSizePx = Math.ceil(FONT_SIZE * 100);
+        context.font = `${fontSizePx}px Arial`;
+        const textWidth = context.measureText(termName).width;
 
-        // Add text label as a Sprite
-        // const canvas = document.createElement('canvas');
-        // const context = canvas.getContext('2d');
-        // const fontSizePx = Math.ceil(FONT_SIZE * 100);
-        // context.font = `${fontSizePx}px Arial`;
-        // const textWidth = context.measureText(termName).width;
-        // canvas.width = textWidth + 10;
-        // canvas.height = fontSizePx + 10;
-        // context.font = `${fontSizePx}px Arial`;
-        // context.fillStyle = 'white';
-        // context.textAlign = 'center';
-        // context.textBaseline = 'middle';
-        // context.fillText(termName, canvas.width / 2, canvas.height / 2);
+        canvas.width = textWidth + 10;
+        canvas.height = fontSizePx + 10;
+        context.font = `${fontSizePx}px Arial`;
+        context.fillStyle = 'white';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(termName, canvas.width / 2, canvas.height / 2);
 
-        // const texture = new THREE.CanvasTexture(canvas);
-        // const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
-        // const sprite = new THREE.Sprite(spriteMaterial);
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        const sprite = new THREE.Sprite(spriteMaterial);
 
-        // sprite.position.set(orb.position.x, orb.position.y + scaledRadius + FONT_SIZE * 0.5, orb.position.z);
-        // sprite.scale.set(canvas.width / fontSizePx * FONT_SIZE, canvas.height / fontSizePx * FONT_SIZE, 1);
-        // orbGroup.add(sprite);
+        sprite.position.set(orb.position.x, orb.position.y + scaledRadius + FONT_SIZE * 0.5, orb.position.z);
+        sprite.scale.set(canvas.width / fontSizePx * FONT_SIZE, canvas.height / fontSizePx * FONT_SIZE, 1);
+
+        //🌟 Attach ID reference
+        sprite.userData = { orbId: termId };
+        orbGroup.add(sprite);
+
     });
 }
 
@@ -393,19 +400,22 @@ function applyForces() {
     if (!orbGroup) return;
 
     const orbs = orbGroup.children.filter(child => child.isMesh);
-    const centerForce = orbA.position.clone().multiplyScalar(-0.002); // was -0.0001
-        orbA.position.add(centerForce);
-    // Add a swirl/rotational force around Y axis
-    const swirlStrength = 0.003;
-    const swirl = new THREE.Vector3(-orbA.position.z, 0, orbA.position.x).normalize().multiplyScalar(swirlStrength);
-        orbA.position.add(swirl);
     const repulsionStrength = 0.005;
     const attractionStrength = 0.002;
 
     for (let i = 0; i < orbs.length; i++) {
         let orbA = orbs[i];
         let force = new THREE.Vector3(0, 0, 0);
-
+        
+        const centerForce = orbA.position.clone().multiplyScalar(-0.002); // was -0.0001
+        orbA.position.add(centerForce);
+        // Add a swirl/rotational force around Y axis
+        const swirlStrength = 0.003;
+        const swirl = new THREE.Vector3(-orbA.position.z, 0, orbA.position.x)
+            .normalize()
+            .multiplyScalar(swirlStrength);
+        orbA.position.add(swirl);
+        
         for (let j = 0; j < orbs.length; j++) {
             if (i === j) continue;
 
@@ -437,7 +447,11 @@ function applyForces() {
         orbA.scale.setScalar(pulseFactor);
 
         // Update sprite position to stay with its orb
-        const sprite = orbGroup.children.find(child => child.isSprite && child.position.x === orbA.position.x && child.position.y === orbA.position.y);
+        const sprite = orbGroup.children.find(
+            child => child.isSprite && 
+                child.userData.orbId === orbA.userData.id
+        );
+
         if (sprite) {
             sprite.position.set(orbA.position.x, orbA.position.y + orbA.geometry.parameters.radius * orbA.scale.y + FONT_SIZE * 0.5, orbA.position.z);
         }
