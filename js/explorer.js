@@ -161,6 +161,51 @@ function setupLighting() {
  * @param {HTMLElement} commandInput - The command input field.
  */
 function setupOrbsAreaInteraction(orbDisplayArea, commandInput) {
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    orbDisplayArea.addEventListener('click', (e) => {
+        const rect = renderer.domElement.getBoundingClientRect();
+        mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(orbGroup.children.filter(c => c.isMesh));
+        function focusOnOrb(orb) {
+            focusedOrb = orb;
+            // Animate to center
+            new TWEEN.Tween(orb.position)
+                .to({ x: 0, y: 0, z: 0 }, 800)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .start();
+            
+            // Animate scale up
+            new TWEEN.Tween(orb.scale)
+                .to({ x: 2, y: 2, z: 2 }, 1000)
+                .easing(TWEEN.Easing.Elastic.Out)
+                .start();
+            
+            // Optional: shrink others
+            orbGroup.children.forEach(child => {
+                if (child !== orb && child.isMesh) {
+                    new TWEEN.Tween(child.scale)
+                        .to({ x: 0.1, y: 0.1, z: 0.1 }, 500)
+                        .easing(TWEEN.Easing.Quadratic.InOut)
+                        .start();
+                }
+            });
+            
+            showOrbDetails(orb.userData.term, orb.userData.definitions?.[0]);
+        }
+
+        if (intersects.length > 0) {
+            const clicked = intersects[0].object;
+            const term = clicked.userData.term;
+            console.log(`Clicked orb: ${term}`);
+            // You can add highlight animation or open detail panel here
+        }
+    });
+
     orbDisplayArea.addEventListener('mousedown', (e) => {
         if (e.target !== commandInput) {
             isDragging = true;
@@ -317,26 +362,26 @@ function renderOrbs() {
         orbGroup.add(orb);
 
         // Add text label as a Sprite
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        const fontSizePx = Math.ceil(FONT_SIZE * 100);
-        context.font = `${fontSizePx}px Arial`;
-        const textWidth = context.measureText(termName).width;
-        canvas.width = textWidth + 10;
-        canvas.height = fontSizePx + 10;
-        context.font = `${fontSizePx}px Arial`;
-        context.fillStyle = 'white';
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        context.fillText(termName, canvas.width / 2, canvas.height / 2);
+        // const canvas = document.createElement('canvas');
+        // const context = canvas.getContext('2d');
+        // const fontSizePx = Math.ceil(FONT_SIZE * 100);
+        // context.font = `${fontSizePx}px Arial`;
+        // const textWidth = context.measureText(termName).width;
+        // canvas.width = textWidth + 10;
+        // canvas.height = fontSizePx + 10;
+        // context.font = `${fontSizePx}px Arial`;
+        // context.fillStyle = 'white';
+        // context.textAlign = 'center';
+        // context.textBaseline = 'middle';
+        // context.fillText(termName, canvas.width / 2, canvas.height / 2);
 
-        const texture = new THREE.CanvasTexture(canvas);
-        const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
-        const sprite = new THREE.Sprite(spriteMaterial);
+        // const texture = new THREE.CanvasTexture(canvas);
+        // const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+        // const sprite = new THREE.Sprite(spriteMaterial);
 
-        sprite.position.set(orb.position.x, orb.position.y + scaledRadius + FONT_SIZE * 0.5, orb.position.z);
-        sprite.scale.set(canvas.width / fontSizePx * FONT_SIZE, canvas.height / fontSizePx * FONT_SIZE, 1);
-        orbGroup.add(sprite);
+        // sprite.position.set(orb.position.x, orb.position.y + scaledRadius + FONT_SIZE * 0.5, orb.position.z);
+        // sprite.scale.set(canvas.width / fontSizePx * FONT_SIZE, canvas.height / fontSizePx * FONT_SIZE, 1);
+        // orbGroup.add(sprite);
     });
 }
 
@@ -347,7 +392,12 @@ function applyForces() {
     if (!orbGroup) return;
 
     const orbs = orbGroup.children.filter(child => child.isMesh);
-
+    const centerForce = orbA.position.clone().multiplyScalar(-0.002); // was -0.0001
+        orbA.position.add(centerForce);
+    // Add a swirl/rotational force around Y axis
+    const swirlStrength = 0.003;
+    const swirl = new THREE.Vector3(-orbA.position.z, 0, orbA.position.x).normalize().multiplyScalar(swirlStrength);
+        orbA.position.add(swirl);
     const repulsionStrength = 0.005;
     const attractionStrength = 0.002;
 
@@ -400,6 +450,8 @@ function animate() {
     requestAnimationFrame(animate);
 
     applyForces();
+
+    TWEEN.update(); // ← This is the magic line ✨
 
     // Render the scene using the EffectComposer for post-processing effects
     if (composer) {
