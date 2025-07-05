@@ -194,55 +194,31 @@
                 };
             });
         }
-
-        // Authentication and module initialization
-        let currentUserId = 'anonymous'; // Default or anonymous user ID
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                currentUserId = user.uid;
-                console.log("Firebase initialized and user signed in:", currentUserId);
-            } else {
-                // If no user, sign in anonymously or handle as needed
-                console.log("No user signed in. Attempting anonymous sign-in.");
-                try {
-                    await signInAnonymously(auth);
-                    // onAuthStateChanged will be called again with the anonymous user
-                } catch (error) {
-                    console.error("Error during anonymous sign-in:", error);
-                    // Fallback for when Firebase isn't available (e.g., local dev without emulator)
-                    // If signInAnonymously fails, proceed with null DB/Auth to allow UI to load
-                    initAdmin(null, null, appId, 'anonymous', () => new Date(), Papa, showConfirmModal, null, null, null, null, null, null, null);
-                    initExplorer(null, appId, null, null, null);
-                }
-            }
-            // Once authentication state is known, initialize modules
-            // Pass all Firebase functions needed for modular approach
-            initAdmin(db, auth, appId, currentUserId, serverTimestamp, Papa, showConfirmModal, collection, query, where, addDoc, getDocs, doc, updateDoc, deleteDoc);
-            initExplorer(db, appId, collection, query, getDocs);
-
-            // Tab switching logic
-            const explorerTab = document.getElementById('explorer-tab');
-            const adminTab = document.getElementById('admin-tab');
-            const explorerSection = document.getElementById('explorer-section');
-            const adminSection = document.getElementById('admin-section');
-
-            explorerTab.addEventListener('click', () => {
-                explorerSection.classList.remove('hidden');
-                explorerTab.classList.add('active');
-                adminSection.classList.add('hidden');
-                adminTab.classList.remove('active');
-            });
-
-            adminTab.addEventListener('click', () => {
-                adminSection.classList.remove('hidden');
-                adminTab.classList.add('active');
-                explorerSection.classList.add('hidden');
-                explorerTab.classList.remove('active');
-            });
-
-            // Ensure initial active tab is set correctly
-            explorerTab.click(); // Default to explorer mode on load
-        }); // <-- CORRECTED: Changed '};' to '});'
+       window.addEventListener('DOMContentLoaded', () => {
+           initializeFirebase();
+           
+           // Tab switching logic
+           const explorerTab = document.getElementById('explorer-tab');
+           const adminTab = document.getElementById('admin-tab');
+           const explorerSection = document.getElementById('explorer-section');
+           const adminSection = document.getElementById('admin-section');
+           
+           explorerTab.addEventListener('click', () => {
+               explorerSection.classList.remove('hidden');
+               explorerTab.classList.add('active');
+               adminSection.classList.add('hidden');
+               adminTab.classList.remove('active');
+           });
+           
+           adminTab.addEventListener('click', () => {
+               adminSection.classList.remove('hidden');
+               adminTab.classList.add('active');
+               explorerSection.classList.add('hidden');
+               explorerTab.classList.remove('active');
+           });
+           
+           explorerTab.click(); // Default to explorer mode
+       });
     </script>
 </body>
 </html>
