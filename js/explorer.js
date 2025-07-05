@@ -409,6 +409,9 @@ function applyForces() {
         
         const centerForce = orbA.position.clone().multiplyScalar(-0.002); // was -0.0001
         orbA.position.add(centerForce);
+        // ... physics loop ...
+        const softCenterCorrection = orbA.position.clone().multiplyScalar(-0.0001);
+        orbA.position.add(softCenterCorrection);
         // Add a swirl/rotational force around Y axis
         const swirlStrength = 0.003;
         const swirl = new THREE.Vector3(-orbA.position.z, 0, orbA.position.x)
@@ -437,9 +440,6 @@ function applyForces() {
             }
         }
         orbA.position.add(force);
-
-        const centerForce = orbA.position.clone().multiplyScalar(-0.0001);
-        orbA.position.add(centerForce);
 
         const scaleBase = orbA.userData.style.baseScale;
         const pulseSpeed = orbA.userData.style.pulseSpeed;
